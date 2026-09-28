@@ -1,0 +1,34 @@
+<%- include('../partials/head') %>
+<h1>Élèves</h1>
+<p>
+  <a href="/admin/students/import<%= filter && filter !== 'none' ? `?group=${filter}` : '' %>" role="button">Importer un CSV</a>
+</p>
+<details <%- Object.keys(errors).length > 0 ? 'open' : '' %>>
+  <summary role="button" class="secondary">Ajouter un élève</summary>
+  <form method="post" action="/admin/students" data-testid="create-student">
+    <%- include('../partials/student-fields') %>
+    <button type="submit">Créer et afficher le QR code</button>
+  </form>
+</details>
+<%- include('../partials/group-filter') %>
+<% if (students.length > 0) { %>
+<div class="scroll">
+<table>
+  <thead><tr><th>Nom</th><th>Date de naissance</th><th>Classe</th><th>Dernière connexion</th><th>État</th></tr></thead>
+  <tbody>
+  <% students.forEach((s) => { %>
+    <tr data-testid="student-row" class="<%= s.active ? '' : 'muted' %>">
+      <td><a href="/admin/students/<%= s.id %>"><%= s.name %></a></td>
+      <td><%= s.dob %></td>
+      <td><%= s.group || '—' %></td>
+      <td><%= fmtDateTime(s.lastLoginAt) || '—' %></td>
+      <td><%= s.active ? 'Actif' : 'Compte désactivé' %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } else { %>
+  <p data-testid="empty">Aucun élève.</p>
+<% } %>
+<%- include('../partials/foot') %>

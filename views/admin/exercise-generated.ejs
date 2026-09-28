@@ -1,0 +1,22 @@
+<%- include('../partials/head') %>
+<%- include('exercise-header') %>
+<article>
+  <p><strong><%= generator.label %></strong>&nbsp;: <%= generator.description %></p>
+  <p data-testid="params-summary"><%= summary %></p>
+</article>
+<h2>Réglages</h2>
+<form method="post" action="/admin/exercises/<%= exercise.id %>" data-testid="generated-form">
+  <label>Nom (unique)
+    <input name="name" value="<%= values.name ?? '' %>" maxlength="150" required <%- errors.name ? 'aria-invalid="true"' : '' %>>
+    <% if (errors.name) { %><small data-testid="error-name"><%= errors.name %></small><% } %>
+  </label>
+  <% if (paramsView && attemptCount > 0) { %>
+    <p><small>Des élèves ont commencé cet exercice&nbsp;: les réglages du tirage sont figés pour que leurs tentatives gardent les mêmes nombres. Créez un nouvel exercice pour d’autres réglages.</small></p>
+    <fieldset disabled><%- include(paramsView) %></fieldset>
+  <% } else if (paramsView) { %>
+    <%- include(paramsView) %>
+  <% } %>
+  <%- include('retry-option') %>
+  <button type="submit" data-testid="save-exercise">Enregistrer</button>
+</form>
+<%- include('../partials/foot') %>

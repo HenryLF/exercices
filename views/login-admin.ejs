@@ -1,0 +1,17 @@
+<%- include('partials/head') %>
+<article class="narrow">
+  <h1>Connexion administrateur</h1>
+  <%- include('partials/form-error') %>
+  <form method="post">
+    <label>Identifiant
+      <input name="username" autocomplete="username" required value="<%= values.username ?? '' %>">
+      <% if (errors.username) { %><small><%= errors.username %></small><% } %>
+    </label>
+    <label>Mot de passe
+      <input type="password" name="password" autocomplete="current-password" required>
+      <% if (errors.password) { %><small><%= errors.password %></small><% } %>
+    </label>
+    <button type="submit">Se connecter</button>
+  </form>
+</article>
+<%- include('partials/foot') %>

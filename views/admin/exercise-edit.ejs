@@ -1,0 +1,35 @@
+<%- include('../partials/head') %>
+<% if (exercise) { %>
+<%- include('exercise-header') %>
+<% } else { %>
+<h1>Nouvel exercice</h1>
+<% } %>
+
+<h2>Contenu</h2>
+<% if (errors.length > 0) { %>
+  <div class="flash flash-error" role="alert" data-testid="form-errors">
+    <p>L’exercice n’a pas été enregistré&nbsp;:</p>
+    <ul><% errors.forEach((e) => { %><li><%= e %></li><% }) %></ul>
+  </div>
+<% } %>
+<form method="post" action="<%= exercise ? `/admin/exercises/${exercise.id}` : '/admin/exercises' %>" id="block-form">
+  <label>Nom (unique)
+    <input name="name" value="<%= values.name %>" maxlength="150" required>
+  </label>
+  <% if (lockedKeys.length > 0) { %>
+    <p><small>Des élèves ont commencé cet exercice&nbsp;: les questions existantes peuvent être reformulées, corrigées et déplacées, mais pas supprimées. Les essais déjà faits ne sont pas recorrigés.</small></p>
+  <% } %>
+  <p><small>Les données et questions qui se suivent forment un tableau&nbsp;; un bloc de texte termine le tableau.</small></p>
+  <div id="blocks">
+    <% values.rows.forEach((row, i) => { %>
+      <%- include('block-row', { row, i, locked: lockedKeys.includes(row.key) }) %>
+    <% }) %>
+  </div>
+  <template id="block-template">
+    <%- include('block-row', { row: { key: '', type: 'question', body: '', label: '', hint: '', tooltip: '', amount: '', unit: '', answerType: 'number', value: '', decimals: '2', tolerance: '0', options: '' }, i: '__i__', locked: false }) %>
+  </template>
+  <p><button type="button" class="secondary" id="add-block">Ajouter un bloc</button></p>
+  <button type="submit" data-testid="save-exercise"><%= exercise ? 'Enregistrer l’exercice' : 'Créer l’exercice' %></button>
+</form>
+<script src="/block-editor.js" defer></script>
+<%- include('../partials/foot') %>

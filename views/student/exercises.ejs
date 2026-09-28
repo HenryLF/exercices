@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<h1 class="ex-title">Mes exercices</h1>
+<% if (!hasGroup) { %>
+  <p data-testid="no-group">Vous n’êtes inscrit dans aucune classe pour le moment. Votre professeur doit vous ajouter à une classe.</p>
+<% } else if (exercises.length === 0) { %>
+  <p data-testid="empty">Aucun exercice pour le moment.</p>
+<% } else { %>
+  <% exercises.forEach((e) => { const st = e.standing; const inProgress = st.current && st.current.progress === 'in_progress'; %>
+    <article class="ex-card" data-testid="exercise-row">
+      <a href="/exercises/<%= e.id %>" class="ex-card-title"><%= e.name %></a>
+      <div class="ex-card-row">
+        <span class="ex-card-badges">
+          <% if (e.status === 'closed') { %><%- include('../partials/status', { status: e.status }) %><% } %>
+          <% if (st.completed > 0) { %><span class="badge badge-completed" data-testid="progress">Terminé<%= st.completed > 1 ? ` ×${st.completed}` : '' %></span><% } %>
+          <% if (inProgress) { %><%- include('../partials/progress', { summary: st.current }) %><% } %>
+          <% if (!st.current) { %><%- include('../partials/progress', { summary: { progress: 'todo' } }) %><% } %>
+        </span>
+        <% if (e.status === 'open' && (st.completed === 0 || inProgress || e.canRetry)) { %>
+          <a href="/exercises/<%= e.id %>" role="button" class="<%= st.completed === 0 && !inProgress ? '' : 'secondary' %>"><%= inProgress ? 'Continuer' : st.completed > 0 ? 'S’entraîner encore' : 'Commencer' %></a>
+        <% } %>
+      </div>
+    </article>
+  <% }) %>
+<% } %>
+<%- include('../partials/foot') %>

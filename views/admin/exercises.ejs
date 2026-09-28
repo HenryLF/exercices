@@ -1,0 +1,49 @@
+<%- include('../partials/head') %>
+<h1>Exercices</h1>
+<p>
+  <a href="/admin/exercises/generate" role="button">Générer un exercice</a>
+  <a href="/admin/exercises/new" role="button" class="secondary">Exercice personnalisé</a>
+</p>
+<% if (exercises.length === 0) { %>
+  <p data-testid="empty">Aucun exercice.</p>
+<% } else { %>
+<% if (groups.length > 0) { %>
+  <p><small>Cochez les classes de chaque exercice, puis enregistrez. Un brouillon coché est ouvert aux élèves.</small></p>
+<% } %>
+<form method="post" action="/admin/exercises/assign" data-testid="assign-grid">
+<div class="scroll">
+<table class="assign-grid">
+  <thead>
+    <tr>
+      <th>Exercice</th><th>État</th>
+      <% groups.forEach((g) => { %><th class="center" data-testid="group-column"><%= g.name %></th><% }) %>
+      <th class="num" title="Tentatives terminées / commencées">Réussies</th>
+    </tr>
+  </thead>
+  <tbody>
+  <% exercises.forEach((e) => { %>
+    <tr data-testid="exercise-row">
+      <td>
+        <input type="hidden" name="shown" value="<%= e.id %>">
+        <a href="/admin/exercises/<%= e.id %>"><%= e.name %></a>
+        <br><small class="muted"><%= e.kind %></small>
+        · <small><a href="/admin/exercises/<%= e.id %>/delete" class="danger-link" data-testid="delete-<%= e.id %>">Supprimer…</a></small>
+      </td>
+      <td><%- include('../partials/status', { status: e.status }) %></td>
+      <% groups.forEach((g) => { %>
+        <td class="center"><input type="checkbox" name="a" value="<%= e.id %>:<%= g.id %>" aria-label="<%= e.name %> — <%= g.name %>" <%- e.groupIds.includes(g.id) ? 'checked' : '' %>></td>
+      <% }) %>
+      <td class="num"><%= e.completed %>/<%= e.started %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% if (groups.length > 0) { %>
+  <button type="submit" data-testid="save-assign">Enregistrer les affectations</button>
+<% } else { %>
+  <p><small>Créez une <a href="/admin/groups">classe</a> pour pouvoir y affecter des exercices.</small></p>
+<% } %>
+</form>
+<% } %>
+<%- include('../partials/foot') %>

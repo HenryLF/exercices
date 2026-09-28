@@ -1,0 +1,65 @@
+<%# One block of the editor. `i` is the row index, or '__i__' inside the <template>. %>
+<% const n = `blocks[${i}]`; %>
+<fieldset class="question block" data-type="<%= row.type %>" data-answer="<%= row.answerType %>" <%- locked ? 'data-locked' : '' %>>
+  <legend>Bloc <span class="q-num"><%= typeof i === 'number' ? i + 1 : '' %></span></legend>
+  <input type="hidden" name="<%= n %>[key]" value="<%= row.key %>">
+  <label>Type de bloc
+    <% if (locked) { %>
+      <input type="hidden" name="<%= n %>[type]" value="question" class="b-type">
+      <input value="Question" disabled>
+      <small>Déjà des essais&nbsp;: une question ne peut pas être supprimée ni changer de type de réponse.</small>
+    <% } else { %>
+      <select name="<%= n %>[type]" class="b-type">
+        <option value="markdown" <%- row.type === 'markdown' ? 'selected' : '' %>>Texte (markdown)</option>
+        <option value="given" <%- row.type === 'given' ? 'selected' : '' %>>Donnée (ligne de tableau sans saisie)</option>
+        <option value="question" <%- row.type === 'question' ? 'selected' : '' %>>Question</option>
+      </select>
+    <% } %>
+  </label>
+  <div class="b-for-markdown">
+    <label>Texte (markdown&nbsp;: **gras**, *italique*, listes, tableaux…)
+      <textarea name="<%= n %>[body]" rows="4"><%= row.body %></textarea>
+    </label>
+  </div>
+  <div class="b-for-given b-for-question">
+    <div class="row">
+      <label>Intitulé<input name="<%= n %>[label]" value="<%= row.label %>" maxlength="300"></label>
+      <label>Taux (facultatif, ex. 20 %)<input name="<%= n %>[hint]" value="<%= row.hint %>" maxlength="50"></label>
+    </div>
+  </div>
+  <div class="b-for-given row">
+    <label>Montant<input name="<%= n %>[amount]" value="<%= row.amount %>" inputmode="decimal"></label>
+  </div>
+  <div class="b-for-question">
+    <div class="row">
+      <label>Type de réponse
+        <% if (locked) { %>
+          <input type="hidden" name="<%= n %>[answerType]" value="<%= row.answerType %>" class="b-answer">
+          <input value="<%= row.answerType === 'enum' ? 'Choix dans une liste' : 'Nombre' %>" disabled>
+        <% } else { %>
+          <select name="<%= n %>[answerType]" class="b-answer">
+            <option value="number" <%- row.answerType === 'number' ? 'selected' : '' %>>Nombre</option>
+            <option value="enum" <%- row.answerType === 'enum' ? 'selected' : '' %>>Choix dans une liste</option>
+          </select>
+        <% } %>
+      </label>
+      <label>Réponse attendue<input name="<%= n %>[value]" value="<%= row.value %>"></label>
+    </div>
+    <div class="row b-for-number">
+      <label>Décimales<input name="<%= n %>[decimals]" value="<%= row.decimals %>" inputmode="numeric"></label>
+      <label>Tolérance<input name="<%= n %>[tolerance]" value="<%= row.tolerance %>" inputmode="decimal"></label>
+      <label>Unité (€, %…)<input name="<%= n %>[unit]" value="<%= row.unit %>" maxlength="10"></label>
+    </div>
+    <div class="b-for-enum">
+      <label>Options, une par ligne<textarea name="<%= n %>[options]" rows="3"><%= row.options %></textarea></label>
+    </div>
+    <label>Indice (markdown, facultatif)
+      <textarea name="<%= n %>[tooltip]" rows="3"><%= row.tooltip %></textarea>
+    </label>
+  </div>
+  <div class="q-actions">
+    <button type="button" class="secondary outline q-up" aria-label="Monter">↑</button>
+    <button type="button" class="secondary outline q-down" aria-label="Descendre">↓</button>
+    <% if (!locked) { %><button type="button" class="secondary outline q-remove">Supprimer</button><% } %>
+  </div>
+</fieldset>

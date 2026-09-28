@@ -1,0 +1,8 @@
+<%- include('partials/head', { flash: null, path: '' }) %>
+<article>
+  <h1><%= status === 404 ? 'Introuvable' : status === 403 ? 'Accès refusé' : status === 429 ? 'Doucement' : 'Erreur' %></h1>
+  <p data-testid="error-message"><%= message %></p>
+  <p><a href="/">Retour à l’accueil</a></p>
+  <% if (stack) { %><pre><%= stack %></pre><% } %>
+</article>
+<%- include('partials/foot') %>

@@ -1,0 +1,10 @@
+<%- include('../partials/head') %>
+<h1>Générer un exercice</h1>
+<% generators.forEach((g) => { %>
+  <article data-testid="generator-<%= g.kind %>">
+    <h2><%= g.label %></h2>
+    <p><%= g.description %></p>
+    <a href="/admin/exercises/generate/<%= g.kind %>" role="button">Choisir</a>
+  </article>
+<% }) %>
+<%- include('../partials/foot') %>

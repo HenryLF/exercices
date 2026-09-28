@@ -1,0 +1,30 @@
+<%# Title, status controls and assigned classes of an existing exercise. %>
+<hgroup>
+  <h1><%= exercise.name %></h1>
+  <p>
+    <%- include('../partials/status', { status: exercise.status }) %>
+    · <%= exercise.kindLabel %>
+    · <%= attemptCount %> tentative<%= attemptCount > 1 ? 's' : '' %>
+    · <a href="/admin/exercises/<%= exercise.id %>/preview" data-testid="preview">Aperçu</a>
+    · <a href="/admin/exercises/<%= exercise.id %>/results">Résultats</a>
+    · <a href="/admin/exercises/<%= exercise.id %>/export.csv">CSV</a>
+    · <a href="/admin/exercises/<%= exercise.id %>/delete" class="danger-link" data-testid="delete">Supprimer…</a>
+  </p>
+</hgroup>
+<section class="status-bar">
+  <% const labels = { draft: 'Repasser en brouillon', open: 'Ouvrir', closed: 'Fermer' }; %>
+  <% statuses.filter((s) => s !== exercise.status).forEach((s) => { %>
+    <form method="post" action="/admin/exercises/<%= exercise.id %>/status" class="inline">
+      <input type="hidden" name="status" value="<%= s %>">
+      <button type="submit" class="<%= s === 'open' ? '' : 'secondary' %>" data-testid="status-<%= s %>"><%= labels[s] %></button>
+    </form>
+  <% }) %>
+  <p><small>
+    Classes&nbsp;:
+    <% if (exercise.groups.length === 0) { %>aucune.<% } else { %>
+      <% exercise.groups.forEach((g, i) => { %><a href="/admin/groups/<%= g.id %>"><%= g.name %></a><%= i < exercise.groups.length - 1 ? ', ' : '.' %><% }) %>
+    <% } %>
+    L’affectation se règle dans la liste des exercices ou sur la page de chaque classe (l’ordre, sur la page de la classe), et elle ouvre l’exercice.
+    Brouillon&nbsp;: invisible pour les élèves. Fermé&nbsp;: visible, sans nouvelles réponses.
+  </small></p>
+</section>

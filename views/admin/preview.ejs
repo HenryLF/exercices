@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<hgroup>
+  <h1><%= exercise.name %></h1>
+  <p>Aperçu avec les réponses attendues et tous les indices. Rien n’est enregistré. · <a href="/admin/exercises/<%= exercise.id %>">Retour</a></p>
+</hgroup>
+<% if (seed) { %>
+  <% if (seedError) { %><p class="flash flash-error" role="alert" data-testid="seed-error"><%= seedError %></p><% } %>
+  <form method="get" action="/admin/exercises/<%= exercise.id %>/preview" class="seed-form" data-testid="seed-form">
+    <label>Tirage
+      <fieldset role="group">
+        <input name="seed" value="<%= seed %>" maxlength="64" autocomplete="off" spellcheck="false" aria-label="Tirage">
+        <button type="submit">Afficher</button>
+      </fieldset>
+    </label>
+    <p><small>
+      Tirage affiché&nbsp;: <%- include('../partials/seed-link', { exerciseId: exercise.id, seed }) %>
+      · <a href="/admin/exercises/<%= exercise.id %>/preview" data-testid="random-seed">Autre tirage au hasard</a>
+      <br>Collez le tirage d’une tentative (page des résultats ou de l’élève) pour revoir ses nombres.
+    </small></p>
+  </form>
+<% } %>
+<%- include('../partials/exercise-body') %>
+<%- include('../partials/foot') %>

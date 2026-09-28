@@ -1,0 +1,33 @@
+<%- include('../partials/head') %>
+<hgroup>
+  <h1><%= exercise.name %></h1>
+  <p>
+    <%- include('../partials/status', { status: exercise.status }) %>
+    · <a href="/admin/exercises/<%= exercise.id %>">Modifier</a>
+    · <a href="/admin/exercises/<%= exercise.id %>/export.csv" data-testid="csv">Télécharger le CSV</a>
+  </p>
+</hgroup>
+<% if (rows.length === 0) { %>
+  <p data-testid="empty">Aucun élève&nbsp;: affectez l’exercice à une classe.</p>
+<% } else { %>
+<p><small><% if (exercise.generated) { %>Une ligne par tentative (tirage). <% } %>Chaque case donne le nombre d’essais. ✓&nbsp;: résolue, ✗&nbsp;: pas encore, * &nbsp;: indice ouvert.</small></p>
+<div class="scroll">
+<table class="results">
+  <thead><tr><th>Élève</th><th>Classe</th><% if (exercise.generated) { %><th>Tirage</th><% } %><th>Statut</th><% questions.forEach((q) => { %><th title="<%= q.label %>"><%= q.label %></th><% }) %></tr></thead>
+  <tbody>
+  <% rows.forEach((r) => { %>
+    <tr data-testid="result-row">
+      <td><a href="/admin/students/<%= r.id %>"><%= r.name %></a></td>
+      <td><%= r.group || '—' %></td>
+      <% if (exercise.generated) { %><td><% if (r.seed) { %><%- include('../partials/seed-link', { exerciseId: exercise.id, seed: r.seed }) %><% } else { %>—<% } %></td><% } %>
+      <td><%- include('../partials/progress', { summary: r.summary }) %></td>
+      <% questions.forEach((q) => { const st = r.states[q.key]; %>
+        <td class="num <%= st ? (st.solved ? 'cell-ok' : 'cell-ko') : '' %>"><% if (st) { %><%= st.solved ? '✓' : '✗' %> <%= st.tries.length %><%= st.tooltipShown ? '*' : '' %><% } else { %>—<% } %></td>
+      <% }) %>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

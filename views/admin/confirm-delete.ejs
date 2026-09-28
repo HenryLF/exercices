@@ -1,0 +1,13 @@
+<%- include('../partials/head') %>
+<article class="narrow-wide">
+  <h1><%= heading %></h1>
+  <ul data-testid="consequences">
+    <% consequences.forEach((c) => { %><li><%= c %></li><% }) %>
+  </ul>
+  <p><strong>Cette action est définitive.</strong></p>
+  <form method="post" action="<%= action %>" class="inline">
+    <button type="submit" class="danger" data-testid="confirm-delete">Supprimer définitivement</button>
+  </form>
+  <a href="<%= cancel %>" role="button" class="secondary outline">Annuler</a>
+</article>
+<%- include('../partials/foot') %>

@@ -1,0 +1,21 @@
+<fieldset class="line-modes" data-testid="line-modes">
+  <legend><strong>Lignes du tableau</strong></legend>
+  <p><small>Question&nbsp;: l’élève la calcule. Donnée&nbsp;: la valeur est affichée. Masquée&nbsp;: la ligne n’apparaît pas. Le prix d’achat brut et le prix de vente HT sont toujours donnés.</small></p>
+  <% if (errors.lines) { %><p class="flash flash-error" role="alert" data-testid="error-lines"><%= errors.lines %></p><% } %>
+  <div class="scroll">
+  <table>
+    <tbody>
+    <% lines.forEach((l) => { const current = (values.lines && values.lines[l.id]) || 'ask'; %>
+      <tr>
+        <td><%= l.label %></td>
+        <td>
+          <select name="lines[<%= l.id %>]" aria-label="<%= l.label %>" data-testid="line-<%= l.id %>">
+            <% modes.forEach((m) => { %><option value="<%= m.id %>" <%- current === m.id ? 'selected' : '' %>><%= m.label %></option><% }) %>
+          </select>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  </div>
+</fieldset>

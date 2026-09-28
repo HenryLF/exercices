@@ -1,0 +1,80 @@
+<%- include('../partials/head') %>
+<hgroup>
+  <h1><%= student.name %></h1>
+  <p>
+    <span data-testid="student-classes"><%= student.group || 'Sans classe' %></span>
+    · <%= student.active ? 'Actif' : 'Compte désactivé' %>
+    <% if (student.locked) { %> · <strong>bloqué 15 minutes après des erreurs de connexion</strong><% } %>
+    · dernière connexion&nbsp;: <%= fmtDateTime(student.lastLoginAt) || 'jamais' %>
+  </p>
+</hgroup>
+
+<section class="status-bar">
+  <% if (student.active) { %>
+    <a href="/admin/students/<%= student.id %>/qr" role="button" data-testid="show-qr">QR code</a>
+    <a href="/admin/students/<%= student.id %>/qr.png" role="button" class="secondary" data-testid="download-qr">Télécharger le PNG</a>
+  <% } %>
+  <form method="post" action="/admin/students/<%= student.id %>/qr" class="inline">
+    <button type="submit" class="secondary" data-testid="regenerate-qr"><%= student.active ? 'Nouveau QR code' : 'Réactiver avec un nouveau QR code' %></button>
+  </form>
+  <% if (student.active) { %>
+    <form method="post" action="/admin/students/<%= student.id %>/deactivate" class="inline">
+      <button type="submit" class="secondary outline" data-testid="deactivate">Désactiver</button>
+    </form>
+  <% } %>
+  <p><small>Le QR code peut être imprimé et scanné autant de fois que nécessaire. Un nouveau QR code rend l’ancien inutilisable et déconnecte l’élève de tous ses appareils.</small></p>
+</section>
+
+<h2>Exercices</h2>
+<% if (exercises.length === 0) { %>
+  <p>Aucun exercice affecté à sa classe.</p>
+<% } %>
+<% exercises.forEach((e) => { const st = e.standing; %>
+  <details data-testid="exercise-detail">
+    <summary>
+      <%= e.name %> —
+      <% if (st.completed > 0) { %><span class="badge badge-completed">Terminé<%= st.completed > 1 ? ` ×${st.completed}` : '' %></span><% } %>
+      <% if (st.current && st.current.progress === 'in_progress') { %><%- include('../partials/progress', { summary: st.current }) %><% } %>
+      <% if (!st.current) { %><%- include('../partials/progress', { summary: { progress: 'todo' } }) %><% } %>
+      <small class="muted"><%= st.attempts %> tentative<%= st.attempts > 1 ? 's' : '' %>, <%= st.tries %> essai<%= st.tries > 1 ? 's' : '' %>, <%= st.tooltips %> indice<%= st.tooltips > 1 ? 's' : '' %></small>
+    </summary>
+    <% e.attempts.forEach((a, i) => { %>
+      <h3 class="attempt-title">
+        Tentative <%= i + 1 %><% if (a.seed) { %> · tirage <%- include('../partials/seed-link', { exerciseId: e.id, seed: a.seed }) %><% } %>
+        · <%- include('../partials/progress', { summary: a.summary }) %>
+      </h3>
+      <p><small>Commencée le <%= fmtDateTime(a.summary.startedAt) || '—' %> · terminée le <%= fmtDateTime(a.summary.completedAt) || '—' %></small></p>
+      <div class="scroll">
+      <table>
+        <thead><tr><th>Question</th><th>Attendu</th><th>Essais (valeur saisie)</th><th>Indice</th><th>Résolue</th></tr></thead>
+        <tbody>
+        <% a.questions.forEach((q) => { %>
+          <tr>
+            <td><%= q.label %></td>
+            <td class="num"><%= q.expected %></td>
+            <td>
+              <% q.tries.forEach((t) => { %>
+                <span class="try try-<%= t.correct ? 'ok' : 'ko' %>" title="<%= fmtDateTime(t.at) %>"><%= t.try %>. <%= t.value %><%= t.tooltip ? ' (indice)' : '' %></span>
+              <% }) %>
+              <% if (q.tries.length === 0) { %>—<% } %>
+            </td>
+            <td><%= q.tooltipShown ? 'oui' : 'non' %></td>
+            <td><%= q.solved ? '✓' : '—' %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+      </div>
+    <% }) %>
+    <% if (e.attempts.length === 0) { %><p>Pas encore commencé.</p><% } %>
+  </details>
+<% }) %>
+
+<h2>Modifier</h2>
+<form method="post" action="/admin/students/<%= student.id %>" data-testid="edit-student">
+  <%- include('../partials/student-fields') %>
+  <button type="submit">Enregistrer</button>
+</form>
+<h2>Supprimer</h2>
+<p><a href="/admin/students/<%= student.id %>/delete" role="button" class="danger outline" data-testid="delete">Supprimer l’élève…</a></p>
+<%- include('../partials/foot') %>

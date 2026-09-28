@@ -1,0 +1,68 @@
+<%- include('../partials/head') %>
+<h1><%= group.name %></h1>
+<p>
+  <a href="/admin/students/import?group=<%= group.id %>" role="button">Importer un CSV</a>
+  <a href="/admin/groups/<%= group.id %>/qr" role="button" class="secondary" data-testid="qr-sheet">Planche à imprimer</a>
+  <a href="/admin/groups/<%= group.id %>/qr.zip" role="button" class="secondary" data-testid="qr-zip">Télécharger les QR codes (zip)</a>
+  <a href="/admin?group=<%= group.id %>" role="button" class="secondary outline">Résultats</a>
+</p>
+
+<h2>Élèves (<%= students.filter((s) => s.active).length %>)</h2>
+<% if (students.length === 0) { %>
+  <p>Aucun élève. Importez-les depuis l’export CSV de la vie scolaire.</p>
+<% } else { %>
+<div class="scroll">
+<table>
+  <thead><tr><th>Nom</th><th>Dernière connexion</th><th>État</th></tr></thead>
+  <tbody>
+  <% students.forEach((s) => { %>
+    <tr data-testid="student-row" class="<%= s.active ? '' : 'muted' %>">
+      <td><a href="/admin/students/<%= s.id %>"><%= s.name %></a></td>
+      <td><%= fmtDateTime(s.lastLoginAt) || 'jamais' %></td>
+      <td><%= s.active ? 'Actif' : 'Compte désactivé' %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+
+<section id="exercises">
+<h2>Exercices</h2>
+<% if (exercises.length === 0) { %>
+  <p>Aucun exercice. <a href="/admin/exercises">Créez-en un</a> d’abord.</p>
+<% } else { %>
+<p><small>Cochez les exercices de la classe et réglez leur ordre (les plus petits d’abord). Un brouillon coché est ouvert aux élèves.</small></p>
+<form method="post" action="/admin/groups/<%= group.id %>/exercises" data-testid="assign-form">
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Affecté</th><th>Exercice</th><th>Type</th><th>État</th><th class="num">Ordre</th></tr></thead>
+    <tbody>
+    <% exercises.forEach((e) => { %>
+      <tr data-testid="assign-row">
+        <td><input type="checkbox" name="assigned" value="<%= e.id %>" aria-label="Affecter <%= e.name %>" <%- e.assigned ? 'checked' : '' %>></td>
+        <td><a href="/admin/exercises/<%= e.id %>"><%= e.name %></a></td>
+        <td><%= e.kind %></td>
+        <td><%- include('../partials/status', { status: e.status }) %></td>
+        <td class="num"><input name="position[<%= e.id %>]" value="<%= e.position %>" inputmode="numeric" class="position" aria-label="Ordre de <%= e.name %>"></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+  </div>
+  <button type="submit" data-testid="save-assign">Enregistrer les exercices de la classe</button>
+</form>
+<% } %>
+</section>
+
+<h2>Renommer</h2>
+<form method="post" action="/admin/groups/<%= group.id %>" class="row">
+  <label>Nom
+    <input name="name" required maxlength="100" value="<%= values.name ?? '' %>" <%- errors.name ? 'aria-invalid="true"' : '' %>>
+    <% if (errors.name) { %><small data-testid="error-name"><%= errors.name %></small><% } %>
+  </label>
+  <div><button type="submit" class="secondary">Renommer</button></div>
+</form>
+<h2>Supprimer</h2>
+<p><a href="/admin/groups/<%= group.id %>/delete" role="button" class="danger outline" data-testid="delete">Supprimer la classe…</a> <small>Les élèves et exercices sont conservés.</small></p>
+<%- include('../partials/foot') %>

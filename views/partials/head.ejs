@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0172ad">
+  <title><%= title %> · Exercices</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="<%= pico %>">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header>
+  <nav>
+    <ul><li><strong><a href="/" class="brand">Exercices</a></strong></li></ul>
+    <% if (user) { %>
+    <ul>
+      <% if (user.role === 'admin') { %>
+        <li><a href="/admin" <%- path === '/admin' ? 'aria-current="page"' : '' %>>Résultats</a></li>
+        <li><a href="/admin/exercises" <%- path.startsWith('/admin/exercises') ? 'aria-current="page"' : '' %>>Exercices</a></li>
+        <li><a href="/admin/groups" <%- path.startsWith('/admin/groups') ? 'aria-current="page"' : '' %>>Classes</a></li>
+        <li><a href="/admin/students" <%- path.startsWith('/admin/students') ? 'aria-current="page"' : '' %>>Élèves</a></li>
+      <% } else { %>
+        <li><a href="/exercises" <%- path.startsWith('/exercises') ? 'aria-current="page"' : '' %>>Mes exercices</a></li>
+      <% } %>
+      <li>
+        <form method="post" action="/logout" class="inline">
+          <button type="submit" class="link" data-testid="logout">Se déconnecter<span class="user-name"> (<%= user.name %>)</span></button>
+        </form>
+      </li>
+    </ul>
+    <% } %>
+  </nav>
+</header>
+<main>
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <p class="flash flash-<%= flash.type %>" role="status" data-testid="flash"><%= flash.message %></p>
+<% } %>

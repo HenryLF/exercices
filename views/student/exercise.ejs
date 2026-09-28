@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<h1 class="ex-title"><%= exercise.name %></h1>
+<div class="progress-bar" data-testid="progress-bar">
+  <progress value="<%= summary.solved %>" max="<%= summary.total %>" aria-label="Questions résolues"></progress>
+  <span><strong><%= summary.solved %></strong>/<%= summary.total %></span>
+  <%- include('../partials/progress', { summary }) %>
+</div>
+<% if (done) { %>
+  <article class="flash flash-success" data-testid="done">
+    <p><strong>Exercice terminé&nbsp;!</strong> Toutes les réponses sont justes.</p>
+    <a href="/exercises/next" role="button" data-testid="next">Exercice suivant</a>
+  </article>
+<% } %>
+<% if (completed && exercise.canRetry && !readOnly) { %>
+  <form method="post" action="/exercises/<%= exercise.id %>/retry" class="inline">
+    <button type="submit" class="<%= done ? 'secondary' : '' %>" data-testid="retry">Recommencer avec d’autres nombres</button>
+  </form>
+<% } %>
+<% if (readOnly) { %>
+  <p class="flash flash-error" data-testid="closed">Cet exercice est fermé&nbsp;: il n’accepte plus de réponses.</p>
+<% } %>
+<%- include('../partials/exercise-body') %>
+<p><a href="/exercises">Retour à mes exercices</a></p>
+<script src="/exercise.js" defer></script>
+<%- include('../partials/foot') %>

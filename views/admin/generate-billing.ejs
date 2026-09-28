@@ -1,0 +1,13 @@
+<%- include('../partials/head') %>
+<h1><%= generator.label %></h1>
+<p><%= generator.description %> Le taux de TVA est toujours celui du produit tiré.</p>
+<form method="post" action="/admin/exercises/generate/<%= generator.kind %>" data-testid="generate-form">
+  <label>Nom (facultatif, proposé d’après les réglages)
+    <input name="name" value="<%= values.name ?? '' %>" maxlength="150" <%- errors.name ? 'aria-invalid="true"' : '' %>>
+    <% if (errors.name) { %><small data-testid="error-name"><%= errors.name %></small><% } %>
+  </label>
+  <% if (paramsView) { %><%- include(paramsView) %><% } %>
+  <%- include('retry-option') %>
+  <button type="submit">Créer l’exercice</button>
+</form>
+<%- include('../partials/foot') %>

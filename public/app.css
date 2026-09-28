@@ -1,0 +1,497 @@
+/* Small additions to Pico's classless theme. */
+:root {
+  --ok: #2e7d32;
+  --err: #c62828;
+  --ok-bg: color-mix(in srgb, var(--ok) 12%, transparent);
+  --err-bg: color-mix(in srgb, var(--err) 12%, transparent);
+}
+
+body > header,
+body > main {
+  max-width: 960px;
+  margin-inline: auto;
+}
+a.brand {
+  text-decoration: none;
+}
+
+form.inline {
+  display: inline-block;
+  margin: 0 0.5rem 0.5rem 0;
+}
+form.inline button {
+  margin: 0;
+}
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--pico-primary);
+  text-decoration: underline;
+  width: auto;
+}
+
+.flash {
+  padding: 0.75rem 1rem;
+  border-radius: var(--pico-border-radius);
+}
+.flash-success {
+  background: var(--ok-bg);
+  border-left: 4px solid var(--ok);
+}
+.flash-error {
+  background: var(--err-bg);
+  border-left: 4px solid var(--err);
+}
+.flash ul {
+  margin-bottom: 0;
+}
+small.error,
+.req {
+  color: var(--err);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.8em;
+  border: 1px solid currentColor;
+}
+.badge-open {
+  color: var(--ok);
+}
+.badge-closed {
+  color: var(--err);
+}
+.badge-draft,
+.badge-todo {
+  color: var(--pico-muted-color);
+}
+.badge-completed {
+  color: var(--ok);
+}
+.badge-in_progress {
+  color: var(--pico-primary);
+}
+
+.pre {
+  white-space: pre-line;
+}
+.muted {
+  opacity: 0.6;
+}
+.narrow {
+  max-width: 28rem;
+  margin-inline: auto;
+}
+.scroll {
+  overflow-x: auto;
+}
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0 1rem;
+  align-items: end;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+}
+.check input {
+  margin: 0;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+}
+.stats .big {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+fieldset.question {
+  border: 1px solid var(--pico-muted-border-color);
+  padding: 1rem;
+  border-radius: var(--pico-border-radius);
+  margin-bottom: 1rem;
+}
+fieldset.question legend {
+  padding: 0 0.5rem;
+  font-weight: bold;
+}
+.q-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.q-actions button {
+  width: auto;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+}
+/* Exercise editor: show only the fields of the row's block type and answer type. */
+.js .block[data-type='markdown'] :is(.b-for-given, .b-for-question):not(.b-for-markdown),
+.js .block[data-type='given'] :is(.b-for-markdown, .b-for-question):not(.b-for-given),
+.js .block[data-type='question'] :is(.b-for-markdown, .b-for-given):not(.b-for-question),
+.js .block[data-answer='number'] .b-for-enum,
+.js .block[data-answer='enum'] .b-for-number {
+  display: none;
+}
+
+.checklist label {
+  display: block;
+}
+/* Pico makes a label's <small> a block pulled up under an input; here it follows the name. */
+.checklist label small {
+  display: inline;
+  margin: 0;
+}
+.status-bar {
+  margin-bottom: 1.5rem;
+}
+.pager {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.qr-sheet {
+  text-align: center;
+}
+.qr svg {
+  width: min(320px, 80vw);
+  height: auto;
+}
+.url code {
+  word-break: break-all;
+}
+
+/* Exercise table: one row per given value or question; green when solved, red after a wrong try. */
+.md > :last-child {
+  margin-bottom: 1rem;
+}
+.ex-table td {
+  vertical-align: middle;
+}
+.ex-table tr.given td {
+  background: var(--pico-card-sectioning-background-color);
+}
+.ex-table tr.q-ok td {
+  background: var(--ok-bg);
+}
+.ex-table tr.q-ko td {
+  background: var(--err-bg);
+}
+.ex-table .mark {
+  font-weight: bold;
+}
+.ex-table tr.q-ok .mark {
+  color: var(--ok);
+}
+.ex-table tr.q-ko .mark {
+  color: var(--err);
+}
+.ex-table form.answer,
+.ex-table form.answer fieldset {
+  margin: 0;
+}
+.ex-table form.answer input,
+.ex-table form.answer select {
+  min-width: 7rem;
+  text-align: right;
+}
+.ex-table .unit {
+  align-self: center;
+  padding: 0 0.5rem;
+}
+.ex-table form.tip-form {
+  display: inline;
+  margin: 0;
+}
+.ex-table form.tip-form button {
+  font-size: 0.85em;
+}
+.ex-table tr.tip td {
+  border-left: 4px solid var(--pico-primary);
+  font-size: 0.9em;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.try {
+  display: inline-block;
+  margin: 0 0.5rem 0.25rem 0;
+  padding: 0 0.4rem;
+  border-radius: var(--pico-border-radius);
+}
+.try-ok,
+.cell-ok {
+  background: var(--ok-bg);
+}
+.try-ko,
+.cell-ko {
+  background: var(--err-bg);
+}
+/* Student exercise page: sticky progress, compact solved rows, hint button. */
+.ex-title {
+  margin-bottom: 0.5rem;
+}
+.progress-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+  background: var(--pico-background-color);
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.progress-bar progress {
+  flex: 1;
+  margin: 0;
+}
+.progress-bar span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* Anchored rows land below the sticky bar. */
+.ex-table tr.q {
+  scroll-margin-top: 4rem;
+}
+.answer-ok {
+  display: block;
+  text-align: right;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok);
+}
+button.tip-button {
+  width: auto;
+  margin: 0.25rem 0 0;
+  padding: 0.15rem 0.75rem;
+  font-size: 0.85em;
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--pico-primary);
+  border: 1px solid var(--pico-primary);
+}
+.ex-card {
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.ex-card-title {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+.ex-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.ex-card-row [role='button'] {
+  margin: 0;
+}
+.ex-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+/* Phones: each row becomes label + rate on one line, the answer field on its own full-width line. */
+@media (max-width: 640px) {
+  .ex-table thead {
+    display: none;
+  }
+  .ex-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    border-bottom: 1px solid var(--pico-table-border-color);
+  }
+  .ex-table td {
+    border: none;
+  }
+  .ex-table tr.given {
+    background: var(--pico-card-sectioning-background-color);
+  }
+  .ex-table tr.q-ok {
+    background: var(--ok-bg);
+  }
+  .ex-table tr.q-ko {
+    background: var(--err-bg);
+  }
+  .ex-table tr > td {
+    background: transparent !important;
+  }
+  .ex-table tr.q > td:last-child,
+  .ex-table tr.tip > td {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+  .ex-table form.answer input,
+  .ex-table form.answer select {
+    min-width: 0;
+    /* 16px or more: iOS zooms into smaller fields on focus. */
+    font-size: max(1rem, 16px);
+  }
+  .ex-table tr.q-ok > td:last-child {
+    grid-column: auto;
+    padding-top: 0.75rem;
+  }
+  .ex-table tr.q-ok .muted,
+  .ex-table tr.q-ok br {
+    display: none;
+  }
+  body > header,
+  body > main {
+    padding-inline: 0.75rem;
+  }
+  body > header nav {
+    font-size: 0.9rem;
+  }
+  body > header nav ul {
+    margin: 0;
+  }
+  body > header nav li {
+    padding-block: 0.5rem;
+  }
+  body > header nav form.inline {
+    margin: 0;
+  }
+  .user-name {
+    display: none;
+  }
+  .ex-title {
+    font-size: 1.5rem;
+  }
+  .ex-table td {
+    padding-inline: 0.5rem;
+  }
+}
+table.results th {
+  font-size: 0.8em;
+  max-width: 8rem;
+}
+input.position {
+  width: 5rem;
+  margin: 0;
+  text-align: right;
+}
+h3.attempt-title {
+  font-size: 1rem;
+  margin: 1rem 0 0.25rem;
+}
+code.seed {
+  font-size: 0.8em;
+}
+fieldset.line-modes table td {
+  padding-block: 0.25rem;
+}
+fieldset.line-modes select {
+  margin: 0;
+  min-width: 9rem;
+}
+form.seed-form {
+  max-width: 32rem;
+}
+form.seed-form fieldset {
+  margin-bottom: 0.25rem;
+}
+a.seed-link {
+  text-decoration: none;
+}
+button.danger,
+[role='button'].danger {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+[role='button'].danger.outline {
+  background: transparent;
+  color: var(--err);
+}
+a.danger-link {
+  color: var(--err);
+}
+.warn {
+  color: var(--err);
+}
+.narrow-wide {
+  max-width: 40rem;
+}
+table.assign-grid th.center,
+table.assign-grid td.center {
+  text-align: center;
+}
+table.assign-grid td.center input {
+  margin: 0;
+}
+table.assign-grid th {
+  font-size: 0.85em;
+}
+table.assign-grid th.center {
+  max-width: 6rem;
+  hyphens: auto;
+}
+form.filter {
+  max-width: 20rem;
+}
+
+/* Printable sheet: six cards (QR + name) per A4 page. */
+.qr-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+.qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border: 1px dashed var(--pico-muted-border-color);
+  padding: 0.75rem;
+  break-inside: avoid;
+}
+.qr-card svg {
+  width: 100%;
+  max-width: 12rem;
+  height: auto;
+}
+
+@media print {
+  .qr-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .qr-card {
+    height: 8.5cm;
+  }
+  body > header,
+  .no-print {
+    display: none;
+  }
+  .qr-sheet {
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,63 @@
+<%# Blocks of an exercise. Locals: exercise, segments, readOnly, preview. %>
+<% segments.forEach((seg) => { %>
+  <% if (seg.kind === 'markdown') { %>
+    <div class="md"><%- seg.html %></div>
+  <% } else { const hasHint = seg.rows.some((r) => r.hint); %>
+    <div class="scroll">
+    <table class="ex-table">
+      <thead><tr><th>Élément</th><% if (hasHint) { %><th class="num">Taux</th><% } %><th>Réponse</th></tr></thead>
+      <tbody>
+      <% seg.rows.forEach((r) => { %>
+        <% if (r.type === 'given') { %>
+          <tr class="given" data-testid="given-<%= r.key %>">
+            <td><%= r.label %></td><% if (hasHint) { %><td class="num"><%= r.hint %></td><% } %>
+            <td class="num"><strong><%= r.amount %></strong></td>
+          </tr>
+        <% } else { const action = `/exercises/${exercise.id}/questions/${r.key}`; const locked = readOnly || r.state === 'ok'; %>
+          <tr id="<%= r.key %>" class="q q-<%= r.state %>" data-testid="q-<%= r.key %>" data-state="<%= r.state %>">
+            <td>
+              <span class="mark" aria-hidden="true"><%= r.state === 'ok' ? '✓' : r.state === 'ko' ? '✗' : '' %></span>
+              <%= r.label %>
+              <% if (r.state === 'ok') { %><span class="visually-hidden">(juste)</span><% } else if (r.state === 'ko') { %><span class="visually-hidden">(faux)</span><% } %>
+              <% if (r.tries > 0) { %><br><small class="muted"><%= r.tries %> essai<%= r.tries > 1 ? 's' : '' %></small><% } %>
+              <% if (r.hasTooltip && !r.tooltipHtml && !locked) { %>
+                <form method="post" action="<%= action %>/tooltip" class="tip-form">
+                  <button type="submit" class="tip-button" data-testid="tooltip-<%= r.key %>">Indice</button>
+                </form>
+              <% } %>
+            </td>
+            <% if (hasHint) { %><td class="num"><%= r.hint %></td><% } %>
+            <td>
+              <% if (r.state === 'ok' && !preview) { %>
+              <span class="answer-ok" data-testid="answer-<%= r.key %>"><%= r.value %><%= r.unit ? ` ${r.unit}` : '' %></span>
+              <% } else { %>
+              <form method="post" action="<%= action %>" class="answer">
+                <fieldset role="group" <%- locked ? 'disabled' : '' %>>
+                  <% const shown = preview ? r.expected : r.value; %>
+                  <% if (r.answerType === 'enum') { %>
+                    <select name="value" aria-label="<%= r.label %>" <%- r.error ? 'aria-invalid="true"' : r.state === 'ok' ? 'aria-invalid="false"' : '' %>>
+                      <option value="">Choisir…</option>
+                      <% r.options.forEach((o) => { %><option <%- shown === o ? 'selected' : '' %>><%= o %></option><% }) %>
+                    </select>
+                  <% } else { %>
+                    <input name="value" value="<%= shown ?? '' %>" inputmode="decimal" enterkeyhint="done" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="<%= r.label %>"
+                      <%- r.error || r.state === 'ko' ? 'aria-invalid="true"' : r.state === 'ok' ? 'aria-invalid="false"' : '' %>>
+                  <% } %>
+                  <% if (r.unit) { %><span class="unit"><%= r.unit %></span><% } %>
+                  <% if (!locked) { %><button type="submit" data-testid="submit-<%= r.key %>">Valider</button><% } %>
+                </fieldset>
+              </form>
+              <% } %>
+              <% if (r.error) { %><small class="error" data-testid="error-<%= r.key %>"><%= r.error %></small><% } %>
+            </td>
+          </tr>
+          <% if (r.tooltipHtml) { %>
+            <tr class="tip" data-testid="tip-<%= r.key %>"><td colspan="<%= hasHint ? 3 : 2 %>"><div class="md"><%- r.tooltipHtml %></div></td></tr>
+          <% } %>
+        <% } %>
+      <% }) %>
+      </tbody>
+    </table>
+    </div>
+  <% } %>
+<% }) %>

@@ -1,0 +1,11 @@
+<form method="get" class="filter">
+  <label>Classe
+    <select name="group" data-autosubmit>
+      <option value="">Toutes les classes</option>
+      <% groups.forEach((g) => { %><option value="<%= g.id %>" <%- filter === g.id ? 'selected' : '' %>><%= g.name %></option><% }) %>
+      <option value="none" <%- filter === 'none' ? 'selected' : '' %>>Sans classe</option>
+    </select>
+  </label>
+  <noscript><button type="submit" class="secondary">Filtrer</button></noscript>
+</form>
+<script src="/autosubmit.js" defer></script>

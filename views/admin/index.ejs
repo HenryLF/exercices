@@ -1,0 +1,27 @@
+<%- include('../partials/head') %>
+<h1>Résultats par élève</h1>
+<%- include('../partials/group-filter') %>
+<% if (rows.length === 0) { %>
+  <p data-testid="empty">Aucun élève actif. <a href="/admin/groups">Créez une classe</a> et importez ses élèves.</p>
+<% } else { %>
+<div class="scroll">
+<table>
+  <thead><tr><th>Élève</th><th>Classe</th><th class="num" title="Exercices terminés au moins une fois / exercices de sa classe">Terminés</th><th class="num">En cours</th><th class="num" title="Tentatives terminées, tous tirages confondus">Tentatives réussies</th><th class="num">Essais</th><th class="num">Indices</th><th>Vu le</th></tr></thead>
+  <tbody>
+  <% rows.forEach((r) => { %>
+    <tr data-testid="student-row">
+      <td><a href="/admin/students/<%= r.id %>"><%= r.name %></a></td>
+      <td><%= r.group || '—' %></td>
+      <td class="num" data-testid="completed"><%= r.completed %>/<%= r.assigned %></td>
+      <td class="num"><%= r.inProgress %></td>
+      <td class="num" data-testid="rounds"><%= r.rounds %></td>
+      <td class="num" data-testid="tries"><%= r.tries %></td>
+      <td class="num" data-testid="tooltips"><%= r.tooltips %></td>
+      <td><%= fmtDateTime(r.lastSeen) || '—' %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('../partials/foot') %>

@@ -1,0 +1,20 @@
+<%- include('../partials/head') %>
+<div class="no-print">
+  <h1>QR codes&nbsp;: <%= group.name %></h1>
+  <p>
+    <button type="button" id="print">Imprimer</button>
+    <a href="/admin/groups/<%= group.id %>" role="button" class="secondary outline">Retour</a>
+  </p>
+</div>
+<% if (cards.length === 0) { %><p>Aucun élève actif dans cette classe.</p><% } %>
+<div class="qr-cards">
+  <% cards.forEach((c) => { %>
+    <div class="qr-card" data-testid="qr-card">
+      <div class="qr"><%- c.svg %></div>
+      <strong><%= c.name %></strong>
+      <small><%= group.name %></small>
+    </div>
+  <% }) %>
+</div>
+<script src="/print.js" defer></script>
+<%- include('../partials/foot') %>

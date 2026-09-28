@@ -1,0 +1,14 @@
+<%- include('../partials/head') %>
+<article class="qr-sheet">
+  <h1><%= student.name %></h1>
+  <div class="qr" data-testid="qr"><%- svg %></div>
+  <p><small>Scannez ce code, puis saisissez votre nom et votre date de naissance.</small></p>
+  <p class="url"><code data-testid="login-url"><%= url %></code></p>
+</article>
+<p class="no-print">
+  <button type="button" id="print">Imprimer</button>
+  <a href="/admin/students/<%= student.id %>/qr.png" role="button" class="secondary">Télécharger le PNG</a>
+  <a href="/admin/students/<%= student.id %>" role="button" class="secondary outline">Retour</a>
+</p>
+<script src="/print.js" defer></script>
+<%- include('../partials/foot') %>

@@ -1,0 +1,20 @@
+<%- include('partials/head') %>
+<article class="narrow">
+  <h1>Confirmez votre identité</h1>
+  <p>Saisissez votre nom et votre date de naissance tels que votre professeur les a enregistrés.</p>
+  <%- include('partials/form-error') %>
+  <form method="post">
+    <label>Nom complet
+      <input name="name" autocomplete="name" required maxlength="200" value="<%= values.name ?? '' %>"
+        <%- errors.name ? 'aria-invalid="true"' : '' %>>
+      <% if (errors.name) { %><small><%= errors.name %></small><% } %>
+    </label>
+    <label>Date de naissance
+      <input type="date" name="dob" required value="<%= values.dob ?? '' %>"
+        <%- errors.dob ? 'aria-invalid="true"' : '' %>>
+      <% if (errors.dob) { %><small><%= errors.dob %></small><% } %>
+    </label>
+    <button type="submit">Se connecter</button>
+  </form>
+</article>
+<%- include('partials/foot') %>

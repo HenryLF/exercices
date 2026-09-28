@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<h1>Classes</h1>
+<form method="post" action="/admin/groups" data-testid="create-group" class="row">
+  <label>Nouvelle classe
+    <input name="name" required maxlength="100" placeholder="2nde MRC" value="<%= values.name ?? '' %>" <%- errors.name ? 'aria-invalid="true"' : '' %>>
+    <% if (errors.name) { %><small data-testid="error-name"><%= errors.name %></small><% } %>
+  </label>
+  <div><button type="submit">Créer la classe</button></div>
+</form>
+<% if (groups.length === 0) { %>
+  <p data-testid="empty">Aucune classe.</p>
+<% } else { %>
+<div class="scroll">
+<table>
+  <thead><tr><th>Classe</th><th class="num">Élèves actifs</th><th class="num">Exercices</th></tr></thead>
+  <tbody>
+  <% groups.forEach((g) => { %>
+    <tr data-testid="group-row"><td><a href="/admin/groups/<%= g.id %>"><%= g.name %></a></td><td class="num"><%= g.students %></td><td class="num"><%= g.exercises %></td></tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<% if (withoutGroup > 0) { %><p><a href="/admin/students?group=none"><%= withoutGroup %> élève<%= withoutGroup > 1 ? 's' : '' %> sans classe</a></p><% } %>
+<%- include('../partials/foot') %>
