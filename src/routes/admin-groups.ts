@@ -79,7 +79,7 @@ export function adminGroupsRouter() {
     status = 200,
   ) => {
     const [students, exercises] = await Promise.all([
-      Student.find({ groupIds: group._id }).sort({ active: -1, nameKey: 1 }),
+      Student.find({ groupIds: group._id }).sort({ active: -1, login: 1 }),
       Exercise.find({}, { name: 1, status: 1, kind: 1, position: 1, groupIds: 1 }).sort({
         position: 1,
         name: 1,
@@ -90,7 +90,7 @@ export function adminGroupsRouter() {
       group: { id: group.id as string, name: group.name },
       students: students.map((s) => ({
         id: s.id as string,
-        name: s.name,
+        login: s.login,
         active: s.active,
         lastLoginAt: s.lastLoginAt,
       })),
@@ -207,18 +207,22 @@ export function adminGroupsRouter() {
   });
 
   const activeStudents = (groupId: mongoose.Types.ObjectId) =>
-    Student.find({ groupIds: groupId, active: true }, { name: 1, qrVersion: 1 }).sort({
-      nameKey: 1,
+    Student.find({ groupIds: groupId, active: true }, { login: 1, qrVersion: 1 }).sort({
+      login: 1,
     });
 
-  // Printable sheet: one card (QR + name + login code) per active student.
+  // Printable sheet: one card (QR + login + code) per active student.
   router.get('/admin/groups/:id/qr', async (req, res) => {
     const group = await loadGroup(req.params.id);
     const students = await activeStudents(group._id);
     const cards = await Promise.all(
       students.map(async (s) => {
         const ref = { id: s.id as string, qrVersion: s.qrVersion };
-        return { name: s.name, code: formatCode(loginCode(ref)), svg: await qrSvg(loginUrl(ref)) };
+        return {
+          login: s.login,
+          code: formatCode(loginCode(ref)),
+          svg: await qrSvg(loginUrl(ref)),
+        };
       }),
     );
     res.set('Cache-Control', 'no-store');
@@ -229,13 +233,13 @@ export function adminGroupsRouter() {
     });
   });
 
-  // One PNG per active student, named `<student> - <login code>.png` (no text inside the image).
+  // One PNG per active student, named `<login> - <code>.png` (no text inside the image).
   router.get('/admin/groups/:id/qr.zip', async (req, res) => {
     const group = await loadGroup(req.params.id);
     const students = await activeStudents(group._id);
     const names = uniqueFileNames(
       students.map(
-        (s) => `${s.name} - ${loginCode({ id: s.id as string, qrVersion: s.qrVersion })}`,
+        (s) => `${s.login} - ${loginCode({ id: s.id as string, qrVersion: s.qrVersion })}`,
       ),
       '.png',
     );

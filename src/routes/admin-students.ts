@@ -5,10 +5,11 @@ import { requireRole } from '../auth/middleware.js';
 import { Attempt, questionStates } from '../models/attempt.js';
 import { Exercise } from '../models/exercise.js';
 import { Group } from '../models/group.js';
-import { Student } from '../models/student.js';
+import { createStudentWithLogin, Student } from '../models/student.js';
 import { formatValue } from '../lib/answers.js';
 import { questionBlocks } from '../lib/blocks.js';
 import { setFlash } from '../lib/flash.js';
+import { LOGIN_RE } from '../lib/names.js';
 import { formatCode, loginCode, loginUrl, qrPng, qrSvg } from '../lib/qr.js';
 import { standing, summarizeAttempt } from '../lib/results.js';
 import { blocksFor, isGenerated } from '../lib/content.js';
@@ -16,12 +17,16 @@ import { asArray, fieldErrors } from '../lib/validation.js';
 import { attachment, safeFileName } from '../lib/zip.js';
 import { loadStudent } from './load.js';
 
+const LOGIN_HELP =
+  'Initiale du nom, un point, puis le prénom, en minuscules sans accent ni espace (ex.\u00a0: m.alice)';
+
 const studentSchema = z.object({
-  name: z
-    .string({ error: 'Le nom est obligatoire' })
+  login: z
+    .string({ error: 'L’identifiant est obligatoire' })
     .trim()
-    .min(1, 'Le nom est obligatoire')
-    .max(200),
+    .toLowerCase()
+    .min(1, 'L’identifiant est obligatoire')
+    .regex(LOGIN_RE, LOGIN_HELP),
 });
 
 /** The ticked classes of the form that exist; any number, possibly none. */
@@ -76,7 +81,7 @@ export function adminStudentsRouter() {
     const query = { active: true, ...groupFilter(filter) };
 
     const [students, exercises] = await Promise.all([
-      Student.find(query, { name: 1, groupIds: 1, lastSeenAt: 1, lastLoginAt: 1, nameKey: 1 }),
+      Student.find(query, { login: 1, groupIds: 1, lastSeenAt: 1, lastLoginAt: 1 }),
       Exercise.find({ status: { $ne: 'draft' } }, { groupIds: 1, blocks: 1, generated: 1 }),
     ]);
     const attempts = await Attempt.find({ studentId: { $in: students.map((s) => s._id) } }).lean();
@@ -105,8 +110,7 @@ export function adminStudentsRouter() {
       const seen = [s.lastSeenAt, s.lastLoginAt].filter((d): d is Date => !!d);
       return {
         id: s.id as string,
-        name: s.name,
-        nameKey: s.nameKey,
+        login: s.login,
         group: groupLabel(s.groupIds, names),
         assigned,
         completed,
@@ -117,7 +121,7 @@ export function adminStudentsRouter() {
         lastSeen: seen.length ? new Date(Math.max(...seen.map((d) => d.getTime()))) : null,
       };
     });
-    rows.sort((a, b) => a.group.localeCompare(b.group, 'fr') || a.nameKey.localeCompare(b.nameKey));
+    rows.sort((a, b) => a.group.localeCompare(b.group, 'fr') || a.login.localeCompare(b.login));
 
     res.render('admin/index', { title: 'Résultats', groups, filter, rows });
   });
@@ -134,7 +138,7 @@ export function adminStudentsRouter() {
   ) => {
     const groups = await groupOptions();
     const filter = typeof req.query.group === 'string' ? req.query.group : '';
-    const students = await Student.find(groupFilter(filter)).sort({ active: -1, nameKey: 1 });
+    const students = await Student.find(groupFilter(filter)).sort({ active: -1, login: 1 });
     const names = new Map(groups.map((g) => [g.id, g.name]));
     res.status(status).render('admin/students', {
       title: 'Élèves',
@@ -142,7 +146,7 @@ export function adminStudentsRouter() {
       filter,
       students: students.map((s) => ({
         id: s.id as string,
-        name: s.name,
+        login: s.login,
         group: groupLabel(s.groupIds, names),
         active: s.active,
         lastLoginAt: s.lastLoginAt,
@@ -166,7 +170,13 @@ export function adminStudentsRouter() {
     const groupIds = await chosenGroupIds(req.body);
     if (!parsed.success)
       return renderList(req, res, { ...req.body, groupIds }, fieldErrors(parsed.error), 400);
-    const student = await Student.create({ ...parsed.data, groupIds });
+    const student = await createStudentWithLogin(parsed.data.login, groupIds);
+    if (student.login !== parsed.data.login)
+      setFlash(
+        req,
+        'success',
+        `L’identifiant ${parsed.data.login} était déjà pris\u00a0: l’élève a reçu ${student.login}.`,
+      );
     res.redirect(`/admin/students/${student.id}/qr`);
   });
 
@@ -189,10 +199,10 @@ export function adminStudentsRouter() {
     });
 
     res.status(status).render('admin/student', {
-      title: student.name,
+      title: student.login,
       student: {
         id: student.id as string,
-        name: student.name,
+        login: student.login,
         group: groupLabel(student.groupIds, new Map(groups.map((g) => [g.id, g.name]))),
         active: student.active,
         lastLoginAt: student.lastLoginAt,
@@ -243,7 +253,7 @@ export function adminStudentsRouter() {
       res,
       student,
       {
-        name: student.name,
+        login: student.login,
         groupIds: student.groupIds.map(String),
       },
       {},
@@ -256,6 +266,14 @@ export function adminStudentsRouter() {
     const groupIds = await chosenGroupIds(req.body);
     if (!parsed.success)
       return renderDetail(res, student, { ...req.body, groupIds }, fieldErrors(parsed.error), 400);
+    if (await Student.exists({ login: parsed.data.login, _id: { $ne: student._id } }))
+      return renderDetail(
+        res,
+        student,
+        { ...req.body, groupIds },
+        { login: 'Un autre élève a déjà cet identifiant' },
+        400,
+      );
     student.set({ ...parsed.data, groupIds });
     await student.save();
     setFlash(req, 'success', 'Élève enregistré.');
@@ -277,8 +295,8 @@ export function adminStudentsRouter() {
     const url = loginUrl(ref);
     res.set('Cache-Control', 'no-store');
     res.render('admin/student-qr', {
-      title: `QR code\u00a0: ${student.name}`,
-      student: { id: student.id as string, name: student.name },
+      title: `QR code\u00a0: ${student.login}`,
+      student: { id: student.id as string, login: student.login },
       url,
       code: formatCode(loginCode(ref)),
       svg: await qrSvg(url),
@@ -292,10 +310,10 @@ export function adminStudentsRouter() {
     const png = await qrPng(loginUrl(ref));
     res.set('Cache-Control', 'no-store');
     res.set('Content-Type', 'image/png');
-    // The PNG has no text in it: the login code travels in the file name.
+    // The PNG has no text in it: the login and the code travel in the file name.
     res.set(
       'Content-Disposition',
-      attachment(`${safeFileName(`${student.name} - ${loginCode(ref)}`)}.png`),
+      attachment(`${safeFileName(`${student.login} - ${loginCode(ref)}`)}.png`),
     );
     res.send(png);
   });
@@ -322,8 +340,8 @@ export function adminStudentsRouter() {
     const student = await loadStudent(req.params.id);
     const attempts = await Attempt.countDocuments({ studentId: student._id });
     res.render('admin/confirm-delete', {
-      title: `Supprimer\u00a0: ${student.name}`,
-      heading: `Supprimer l’élève ${student.name}\u00a0?`,
+      title: `Supprimer\u00a0: ${student.login}`,
+      heading: `Supprimer l’élève ${student.login}\u00a0?`,
       consequences: [
         attempts === 0
           ? 'Aucune tentative enregistrée.'
@@ -340,7 +358,7 @@ export function adminStudentsRouter() {
     const student = await loadStudent(req.params.id);
     await Attempt.deleteMany({ studentId: student._id });
     await Student.deleteOne({ _id: student._id });
-    setFlash(req, 'success', `Élève ${student.name} supprimé, avec ses tentatives.`);
+    setFlash(req, 'success', `Élève ${student.login} supprimé, avec ses tentatives.`);
     res.redirect('/admin/students');
   });
 

@@ -40,9 +40,14 @@ export async function loadUser(req: Request, _res: Response, next: NextFunction)
       const a = await Admin.findById(userId, { username: 1, authVersion: 1 });
       if (a && a.authVersion === authVersion) user = { role, id: a.id, name: a.username };
     } else {
-      const s = await Student.findById(userId, { name: 1, authVersion: 1, active: 1, groupIds: 1 });
+      const s = await Student.findById(userId, {
+        login: 1,
+        authVersion: 1,
+        active: 1,
+        groupIds: 1,
+      });
       if (s && s.active && s.authVersion === authVersion)
-        user = { role, id: s.id, name: s.name, groupIds: s.groupIds.map(String) };
+        user = { role, id: s.id, name: s.login, groupIds: s.groupIds.map(String) };
     }
   }
 

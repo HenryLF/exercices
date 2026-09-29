@@ -17,7 +17,7 @@
   <tbody>
   <% students.forEach((s) => { %>
     <tr data-testid="student-row" class="<%= s.active ? '' : 'muted' %>">
-      <td><a href="/admin/students/<%= s.id %>"><%= s.name %></a></td>
+      <td><a href="/admin/students/<%= s.id %>"><%= s.login %></a></td>
       <td><%= fmtDateTime(s.lastLoginAt) || 'jamais' %></td>
       <td><%= s.active ? 'Actif' : 'Compte désactivé' %></td>
     </tr>

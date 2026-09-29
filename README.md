@@ -10,13 +10,15 @@ To add a new kind of generated exercise, follow [docs/GENERATORS.md](docs/GENERA
 
 ## How it works
 
-- **Students** scan their QR code, then type their name and the 6-digit code printed under the
-  QR code. No date of birth is stored. The device stays signed in as long as it is used at
+- **Students** scan their QR code, then type the 6-digit code printed under the QR code. The app
+  knows each student only by a login: the initial of the last name, a dot, then the first name
+  (`m.alice` for MARTIN Alice). No name and no date of birth are stored. The device stays signed in as long as it is used at
   least once a month: the session is renewed every day.
   The same QR code works on any number of devices and can be printed again at any time.
 - **Admins** sign in at `/admin/login`. They create classes, import students from the school
   software's CSV export, print or download the QR codes, create or generate exercises, assign
-  them to classes, and read the results per student or per exercise (with a CSV export).
+  them to classes, and read the results per student or per exercise (with a CSV export). The
+  **Aide** tab (`/admin/help`) is the teachers' guide, including what is stored about pupils.
 - **Every try is recorded**: the value typed, whether it was right, and whether the hint was open.
   For generated exercises, each attempt keeps its seed, so every draw's results stay available.
 - **A new QR code replaces the old one.** Every printed copy of the old code stops working and
@@ -65,13 +67,14 @@ npm run admin -- remove <username>
 
 1. In **Classes**, create the class.
 2. On the class page, click **Importer un CSV** and send the export from the school software.
-   Only the column *Élèves* is read; every other column (date of birth, sex...) is ignored and
-   never stored. If a name matches a student already registered, the import asks, row by row,
-   whether it is the same person (added to this class, same QR code and results) or a new
+   The file is read by your browser and never sent: only the column *Élèves* is read, each name
+   becomes a login (`m.alice`), and only the logins go to the server (a taken login gets a
+   number, `m.alice2`). JavaScript must be on. If a login matches a student of another class, the import
+   asks, row by row, whether it is the same person (added to this class, same QR code and results) or a new
    student. A student can belong to several classes, or none.
-3. Click **Planche à imprimer** to print one card per student (QR code, name and login code), or
+3. Click **Planche à imprimer** to print one card per student (QR code, login and code), or
    **Télécharger les QR codes (zip)** to get one PNG per student, named
-   `<name> - <code>.png` (the image itself has no text, so hand the code over with it).
+   `<login> - <code>.png` (the image itself has no text, so hand the code over with it).
 4. In **Exercices**, click **Générer un exercice**, pick *Calculs commerciaux*, and create it.
    It is endless: every student gets new numbers on each attempt and can start again once
    finished. Check it with **Aperçu**, which shows a new random draw each time.

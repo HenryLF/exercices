@@ -1,14 +1,9 @@
 <%- include('partials/head') %>
 <article class="narrow">
-  <h1>Confirmez votre identité</h1>
-  <p>Saisissez votre nom tel que votre professeur l’a enregistré et le code à 6&nbsp;chiffres imprimé sous votre QR code.</p>
+  <h1>Code de connexion</h1>
+  <p>Saisissez le code à 6&nbsp;chiffres imprimé sous votre QR code.</p>
   <%- include('partials/form-error') %>
   <form method="post">
-    <label>Nom complet
-      <input name="name" autocomplete="name" required maxlength="200" value="<%= values.name ?? '' %>"
-        <%- errors.name ? 'aria-invalid="true"' : '' %>>
-      <% if (errors.name) { %><small><%= errors.name %></small><% } %>
-    </label>
     <label>Code
       <input name="code" required maxlength="20" inputmode="numeric" autocomplete="off"
         value="<%= values.code ?? '' %>" <%- errors.code ? 'aria-invalid="true"' : '' %>>

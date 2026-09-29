@@ -1,11 +1,10 @@
-import { Schema, model, type InferSchemaType } from 'mongoose';
-import { normalizeName } from '../lib/names.js';
+import { Schema, model, type InferSchemaType, type Types } from 'mongoose';
+import { freeLogin, LOGIN_RE } from '../lib/names.js';
 
 const studentSchema = new Schema(
   {
-    name: { type: String, required: true, trim: true, maxlength: 200 },
-    // normalizeName(name), kept in sync by the pre-validate hook; the login form is matched on it.
-    nameKey: { type: String, required: true, index: true },
+    // The only identity kept (m.alice): no name, no date of birth. Unique.
+    login: { type: String, required: true, unique: true, match: LOGIN_RE },
     // Classes the student belongs to: any number, possibly none.
     groupIds: {
       type: [{ type: Schema.Types.ObjectId, ref: 'Group' }],
@@ -25,9 +24,27 @@ const studentSchema = new Schema(
   { timestamps: true },
 );
 
-studentSchema.pre('validate', function () {
-  if (typeof this.name === 'string') this.nameKey = normalizeName(this.name);
-});
-
 export type StudentDoc = InferSchemaType<typeof studentSchema>;
 export const Student = model('Student', studentSchema);
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Creates a student under `base`, or `base2`, `base3`... when taken. */
+export async function createStudentWithLogin(
+  base: string,
+  groupIds: (string | Types.ObjectId)[] = [],
+) {
+  for (;;) {
+    const taken = await Student.find(
+      { login: { $regex: `^${escapeRegex(base)}\\d*$` } },
+      { login: 1 },
+    );
+    const login = freeLogin(base, new Set(taken.map((s) => s.login)));
+    try {
+      return await Student.create({ login, groupIds });
+    } catch (err) {
+      // Someone took it in between: try the next one.
+      if ((err as { code?: number }).code !== 11000) throw err;
+    }
+  }
+}

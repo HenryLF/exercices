@@ -17,7 +17,7 @@
   <tbody>
   <% rows.forEach((r) => { %>
     <tr data-testid="result-row">
-      <td><a href="/admin/students/<%= r.id %>"><%= r.name %></a></td>
+      <td><a href="/admin/students/<%= r.id %>"><%= r.login %></a></td>
       <td><%= r.group || '—' %></td>
       <% if (exercise.generated) { %><td><% if (r.seed) { %><%- include('../partials/seed-link', { exerciseId: exercise.id, seed: r.seed }) %><% } else { %>—<% } %></td><% } %>
       <td><%- include('../partials/progress', { summary: r.summary }) %></td>

@@ -1,0 +1,161 @@
+<%- include('../partials/head') %>
+<h1>Aide</h1>
+<p>Ce guide explique comment préparer une classe, créer et affecter des exercices, puis suivre les résultats. La dernière partie décrit ce que l’application enregistre sur les élèves et comment ces données sont protégées.</p>
+
+<nav aria-label="Sommaire">
+  <ol>
+    <li><a href="#demarrer">Démarrer avec une classe</a></li>
+    <li><a href="#classes">Classes</a></li>
+    <li><a href="#eleves">Élèves et QR codes</a></li>
+    <li><a href="#exercices">Exercices</a></li>
+    <li><a href="#resultats">Résultats</a></li>
+    <li><a href="#fin-annee">Fin d’année</a></li>
+    <li><a href="#confidentialite">Confidentialité et sécurité</a></li>
+  </ol>
+</nav>
+
+<section id="demarrer">
+  <h2>Démarrer avec une classe</h2>
+  <ol>
+    <li><strong>Créez la classe</strong> dans l’onglet <a href="/admin/groups">Classes</a>.</li>
+    <li><strong>Importez les élèves</strong> depuis l’export CSV du logiciel de vie scolaire (bouton <em>Importer un CSV</em> sur la page de la classe).</li>
+    <li><strong>Imprimez les QR codes</strong>&nbsp;: <em>Planche à imprimer</em> (six cartes par page A4) ou <em>Télécharger les QR codes (zip)</em>, une image par élève.</li>
+    <li><strong>Affectez des exercices</strong> à la classe, sur la page de la classe ou dans l’onglet <a href="/admin/exercises">Exercices</a>.</li>
+    <li><strong>Distribuez les cartes.</strong> Chaque élève scanne son QR code avec son téléphone, tape le code à 6&nbsp;chiffres imprimé dessous, et arrive directement sur son premier exercice.</li>
+  </ol>
+</section>
+
+<section id="classes">
+  <h2>Classes</h2>
+  <ul>
+    <li>Une classe regroupe des élèves et les exercices qui leur sont ouverts. Un élève peut appartenir à plusieurs classes, ou à aucune&nbsp;; il voit alors les exercices de toutes ses classes.</li>
+    <li>La page d’une classe liste ses élèves (avec leur dernière connexion) et <strong>tous les exercices</strong>, chacun avec une case <em>Affecté</em> et un <em>Ordre</em>. Les élèves font les exercices du plus petit ordre au plus grand. L’ordre est commun à toutes les classes d’un exercice.</li>
+    <li>Cocher un exercice encore en brouillon l’ouvre aux élèves.</li>
+    <li>Supprimer une classe ne supprime ni ses élèves ni leurs résultats&nbsp;: la classe est seulement retirée des élèves et des exercices. Une page de confirmation détaille les conséquences avant toute suppression.</li>
+  </ul>
+</section>
+
+<section id="eleves">
+  <h2>Élèves et QR codes</h2>
+  <h3>Importer un fichier CSV</h3>
+  <ul>
+    <li>Choisissez la classe, puis le fichier exporté par la vie scolaire (2&nbsp;Mo au plus, séparateur virgule ou point-virgule).</li>
+    <li>Le fichier est <strong>lu par votre navigateur</strong>&nbsp;: seule la colonne <em>Élèves</em> est utilisée, et chaque nom devient un identifiant (initiale du nom, un point, puis le prénom, par exemple MARTIN Alice → <code>m.alice</code>, MARTENS--BILONGO Carlos → <code>m.carlos</code>). Seuls ces identifiants sont envoyés au serveur.</li>
+    <li>Un identifiant déjà pris reçoit un chiffre (<code>m.alice2</code>). Si un identifiant correspond à un élève d’une autre classe, l’application vous demande, ligne par ligne, s’il s’agit du même élève (il est ajouté à la classe et garde son QR code et ses résultats) ou d’un nouveau. Rien n’est enregistré avant votre réponse.</li>
+    <li>Réimporter le même fichier ne crée pas de doublons&nbsp;: les élèves déjà dans la classe sont ignorés.</li>
+  </ul>
+  <h3>Ajouter un élève à la main</h3>
+  <p>Onglet <a href="/admin/students">Élèves</a>, <em>Ajouter un élève</em>&nbsp;: saisissez l’identifiant (initiale du nom, un point, puis le prénom, par exemple <code>m.alice</code>&nbsp;; jamais le nom de famille complet) et cochez ses classes. Son QR code s’affiche aussitôt.</p>
+  <h3>QR code et code de connexion</h3>
+  <ul>
+    <li>Le QR code d’un élève fonctionne <strong>autant de fois que nécessaire, sur n’importe quel appareil</strong>. Vous pouvez le réimprimer à tout moment depuis la page de l’élève&nbsp;: c’est toujours le même.</li>
+    <li>Le code à 6&nbsp;chiffres imprimé avec le QR code est demandé à la connexion. Il protège l’élève si quelqu’un photographie seulement son QR code.</li>
+    <li>Une fois connecté, l’élève reste connecté tant qu’il utilise l’application au moins une fois par mois.</li>
+    <li><strong>Carte perdue ou partagée&nbsp;?</strong> Sur la page de l’élève, <em>Nouveau QR code</em>&nbsp;: l’ancien QR code et l’ancien code ne fonctionnent plus, l’élève est déconnecté de tous ses appareils, et ses résultats sont conservés. Imprimez-lui la nouvelle carte.</li>
+    <li><strong>Élève bloqué&nbsp;?</strong> Après <%= maxFailed %>&nbsp;codes faux, la connexion est bloquée <%= lockMinutes %>&nbsp;minutes. Attendez, ou générez un nouveau QR code, ce qui lève le blocage.</li>
+    <li><em>Désactiver</em> un élève (départ en cours d’année) le déconnecte et rend son QR code inutilisable, sans effacer ses résultats. <em>Réactiver avec un nouveau QR code</em> le rétablit.</li>
+    <li><em>Supprimer</em> un élève efface aussi toutes ses tentatives, définitivement.</li>
+  </ul>
+</section>
+
+<section id="exercices">
+  <h2>Exercices</h2>
+  <p>Un exercice est une suite de blocs&nbsp;: du texte (markdown), des valeurs données et des questions. Chaque question a son propre bouton <em>Valider</em>&nbsp;: la ligne devient verte si la réponse est juste, rouge sinon. L’exercice est terminé quand toutes les lignes sont vertes, et l’élève passe au suivant.</p>
+  <h3>Exercice généré (calculs commerciaux)</h3>
+  <ul>
+    <li><a href="/admin/exercises/generate">Générer un exercice</a>, puis <em>Calculs commerciaux</em>&nbsp;: un produit du catalogue est tiré au hasard, avec son taux de TVA, des prix, une remise et des frais cohérents.</li>
+    <li>Pour chaque ligne du tableau, choisissez de la <strong>demander</strong>, de la <strong>donner</strong> ou de la <strong>masquer</strong>. L’application refuse un réglage où une ligne demandée ne peut pas être calculée à partir de ce qui est affiché.</li>
+    <li>Chaque élève reçoit ses propres nombres. Avec la case <em>Infini</em>, un élève qui a terminé peut recommencer avec d’autres nombres, autant de fois qu’il le souhaite.</li>
+    <li>Chaque question a un <strong>indice</strong> (définition et exemple chiffré), que l’élève ouvre s’il en a besoin. Les indices ouverts sont comptés dans les résultats.</li>
+    <li>Les réglages sont modifiables jusqu’au premier essai d’un élève&nbsp;; ensuite, seul le nom peut changer.</li>
+  </ul>
+  <h3>Exercice personnalisé</h3>
+  <ul>
+    <li><a href="/admin/exercises/new">Exercice personnalisé</a>&nbsp;: ajoutez, déplacez et supprimez des blocs.
+      <ul>
+        <li><strong>Texte</strong>&nbsp;: consigne en markdown (<code>**gras**</code>, <code>*italique*</code>, listes, tableaux).</li>
+        <li><strong>Donnée</strong>&nbsp;: une ligne du tableau sans saisie (un prix d’achat, par exemple).</li>
+        <li><strong>Question</strong>&nbsp;: un nombre (avec le nombre de décimales et une tolérance éventuelle) ou un choix parmi une liste. Un indice facultatif peut être ajouté.</li>
+      </ul>
+    </li>
+    <li>Les réponses sont exactes&nbsp;: l’élève peut écrire <code>1 250,00</code>, <code>1250</code> ou <code>1250 €</code>, la valeur est arrondie au nombre de décimales demandé puis comparée à la réponse attendue, à la tolérance près.</li>
+    <li>Une fois que des élèves ont commencé, on peut encore corriger les libellés, les indices, les textes et la valeur attendue (les essais passés ne sont pas recorrigés), mais pas supprimer une question ni changer son type.</li>
+  </ul>
+  <h3>États, aperçu et affectation</h3>
+  <ul>
+    <li><strong>Brouillon</strong>&nbsp;: invisible des élèves. <strong>Ouvert</strong>&nbsp;: les élèves répondent. <strong>Fermé</strong>&nbsp;: visible en lecture seule, les réponses ne sont plus acceptées.</li>
+    <li><em>Aperçu</em> montre l’exercice comme un élève le voit, avec les réponses attendues, sans rien enregistrer. Pour un exercice généré, chaque aperçu est un nouveau tirage&nbsp;; le numéro de tirage affiché dans les résultats rouvre exactement les nombres qu’un élève a eus.</li>
+    <li>L’onglet <a href="/admin/exercises">Exercices</a> est aussi une grille d’affectation&nbsp;: une case par exercice et par classe, puis <em>Enregistrer les affectations</em>.</li>
+    <li>Supprimer un exercice efface toutes ses tentatives.</li>
+  </ul>
+</section>
+
+<section id="resultats">
+  <h2>Résultats</h2>
+  <ul>
+    <li>L’onglet <a href="/admin">Résultats</a> présente une ligne par élève&nbsp;: exercices terminés sur exercices affectés, en cours, essais, indices ouverts et dernière visite. Filtrez par classe.</li>
+    <li>La page d’un élève détaille chaque exercice et chaque tentative&nbsp;: pour chaque question, la réponse attendue, chaque valeur saisie (juste ou fausse), si l’indice était ouvert, et l’heure.</li>
+    <li>Depuis un exercice, <em>Résultats</em> présente les mêmes données par élève, avec un export CSV qui s’ouvre dans un tableur (LibreOffice, Excel).</li>
+  </ul>
+</section>
+
+<section id="fin-annee">
+  <h2>Fin d’année</h2>
+  <p>En fin d’année scolaire, les données des élèves doivent être effacées. La personne qui administre le serveur lance <code>npm run purge</code>&nbsp;: la commande affiche d’abord ce qui serait supprimé, puis, avec <code>--yes</code>, efface tous les élèves, toutes leurs tentatives et toutes leurs sessions. Les exercices et les comptes enseignants sont conservés&nbsp;; les classes aussi, sauf avec <code>--with-groups</code>. Rien ne peut être récupéré ensuite. Exportez avant les résultats dont vous avez besoin.</p>
+</section>
+
+<section id="confidentialite">
+  <h2>Confidentialité et sécurité</h2>
+  <p>Les élèves sont mineurs. L’application est conçue pour en savoir le moins possible sur eux&nbsp;: une donnée qui n’est pas enregistrée ne peut pas fuiter.</p>
+
+  <h3>Ce qui est enregistré</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Donnée</th><th>Pourquoi</th></tr></thead>
+    <tbody>
+      <tr><td>Identifiant (initiale du nom, un point, puis le prénom, ex.&nbsp;: <code>m.alice</code>)</td><td>Vous permettre de reconnaître l’élève</td></tr>
+      <tr><td>Classes</td><td>Savoir quels exercices lui ouvrir</td></tr>
+      <tr><td>Réponses&nbsp;: valeur saisie, juste ou fausse, indice ouvert, date et heure</td><td>Les résultats</td></tr>
+      <tr><td>Dates de dernière connexion et de dernière visite</td><td>Repérer les élèves qui ne se connectent pas</td></tr>
+      <tr><td>Compteur d’erreurs de code, blocage temporaire</td><td>Empêcher de deviner le code</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><strong>Ce qui n’est jamais enregistré</strong>&nbsp;: nom de famille, date de naissance, sexe, adresse e-mail, téléphone, photo, ni aucune autre colonne de l’export de la vie scolaire. Le fichier CSV lui-même n’est jamais envoyé&nbsp;: votre navigateur le lit et ne transmet que les identifiants. L’application ne demande aucune donnée personnelle aux élèves.</p>
+
+  <h3>Connexion des élèves</h3>
+  <ul>
+    <li>Le QR code et le code à 6&nbsp;chiffres ne sont <strong>pas stockés</strong>&nbsp;: ils sont recalculés à partir d’une clé secrète connue du seul serveur. Une copie de la base de données ne permet donc pas de se connecter à la place d’un élève.</li>
+    <li>Il faut les <strong>deux</strong>&nbsp;: le QR code seul ne suffit pas. Après <%= maxFailed %>&nbsp;codes faux, le compte est bloqué <%= lockMinutes %>&nbsp;minutes, et le nombre d’essais par adresse IP est limité.</li>
+    <li>La session d’un élève dure 30&nbsp;jours et son identifiant de session est remplacé chaque jour. <em>Nouveau QR code</em> et <em>Désactiver</em> déconnectent l’élève immédiatement de tous ses appareils.</li>
+    <li>Les réponses attendues ne sont jamais envoyées au téléphone de l’élève.</li>
+  </ul>
+
+  <h3>Comptes enseignants</h3>
+  <ul>
+    <li>Les comptes sont créés par la personne qui administre le serveur, pas depuis le site. Les mots de passe sont stockés sous forme hachée (bcrypt), jamais en clair.</li>
+    <li>Une session enseignant expire après 12&nbsp;heures d’inactivité.</li>
+    <li>Les tentatives de connexion sont limitées par adresse IP.</li>
+  </ul>
+
+  <h3>Protections techniques</h3>
+  <ul>
+    <li>Tout le trafic passe en HTTPS. Les cookies de session sont inaccessibles aux scripts (<code>HttpOnly</code>), envoyés uniquement en HTTPS (<code>Secure</code>) et pas aux autres sites (<code>SameSite</code>).</li>
+    <li>Les formulaires venant d’un autre site sont refusés, et une politique de sécurité du contenu (CSP) interdit les scripts extérieurs à l’application. Le texte des exercices est affiché sans HTML brut.</li>
+    <li>Aucun outil de mesure d’audience, aucune publicité, aucun traceur. Seule la feuille de style (Pico CSS) est chargée depuis un CDN public (jsDelivr).</li>
+    <li>L’application est hébergée chez Vercel et les données dans une base MongoDB Atlas, dont la région est choisie au déploiement. Les codes de connexion et les mots de passe ne sont jamais écrits dans les journaux.</li>
+  </ul>
+
+  <h3>Durée de conservation</h3>
+  <p>Les données d’un élève sont conservées jusqu’à sa suppression ou jusqu’à la purge de fin d’année (<a href="#fin-annee">voir plus haut</a>). Supprimer un élève efface aussitôt ses tentatives&nbsp;; ses sessions expirent d’elles-mêmes et ne permettent plus aucun accès. Pour répondre à une famille qui demande l’accès aux données de son enfant, la page de l’élève montre tout ce qui est enregistré le concernant&nbsp;; pour une demande d’effacement, supprimez l’élève.</p>
+
+  <h3>Vos bonnes pratiques</h3>
+  <ul>
+    <li><strong>Traitez les cartes QR comme des mots de passe.</strong> Distribuez-les en main propre, détruisez les planches inutilisées, ne publiez pas le zip (ENT, messagerie, drive partagé). En cas de doute, générez un nouveau QR code.</li>
+    <li><strong>Supprimez l’export CSV</strong> de la vie scolaire de votre ordinateur après l’import, ainsi que les exports de résultats dont vous n’avez plus besoin.</li>
+    <li><strong>N’écrivez aucune donnée personnelle</strong> dans les exercices (consignes, indices, noms d’exercices)&nbsp;: ils sont visibles par toutes les classes affectées.</li>
+    <li><strong>Déconnectez-vous</strong> sur un ordinateur partagé (salle des professeurs, vidéoprojecteur) et ne communiquez jamais votre mot de passe.</li>
+    <li>Signalez toute perte de carte, tout accès suspect ou toute demande d’une famille à la personne qui administre le serveur.</li>
+  </ul>
+</section>
+<%- include('../partials/foot') %>

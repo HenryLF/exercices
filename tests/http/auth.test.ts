@@ -101,38 +101,32 @@ describe('student QR login', () => {
     expect((await request(app).get(`/login/${s.token}`)).status).toBe(200);
   });
 
-  it('matches name loosely and code exactly; counts failures; locks after 5', async () => {
+  it('checks the code; counts failures; locks after 5', async () => {
     const s = await createStudent();
     const wrongCode = s.code === '000000' ? '000001' : '000000';
-    const bad = await request(app)
-      .post(`/login/${s.token}`)
-      .type('form')
-      .send({ name: s.name, code: wrongCode });
+    const bad = await request(app).post(`/login/${s.token}`).type('form').send({ code: wrongCode });
     expect(bad.status).toBe(400);
-    expect(bad.text).toContain('Le nom ou le code ne correspond pas');
+    expect(bad.text).toContain('Ce code ne correspond pas');
     expect((await Student.findById(s.student._id))!.failedAttempts).toBe(1);
     for (let i = 0; i < 3; i++)
-      await request(app).post(`/login/${s.token}`).type('form').send({ name: 'x', code: s.code });
+      await request(app).post(`/login/${s.token}`).type('form').send({ code: wrongCode });
     const fifth = await request(app)
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: 'x', code: s.code });
+      .send({ code: wrongCode });
     expect(fifth.status).toBe(429);
-    const locked = await request(app)
-      .post(`/login/${s.token}`)
-      .type('form')
-      .send({ name: s.name, code: s.code });
+    const locked = await request(app).post(`/login/${s.token}`).type('form').send({ code: s.code });
     expect(locked.status).toBe(429);
   });
 
   it('the same QR code works on several devices at once, for 30 days', async () => {
-    const s = await createStudent({ name: 'Élodie Martin' });
+    const s = await createStudent();
     const phone = request.agent(app);
     const laptop = request.agent(app);
     const res = await phone
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: 'ELODIE martin', code: ` ${s.code.slice(0, 3)} ${s.code.slice(3)} ` });
+      .send({ code: ` ${s.code.slice(0, 3)} ${s.code.slice(3)} ` });
     expect(res.headers.location).toBe('/exercises/next');
     expect([res.headers['set-cookie']].flat().join()).toMatch(/Expires=/);
     await loginAsStudent(laptop, s);
@@ -169,10 +163,7 @@ describe('daily session renewal', () => {
     const group = await createGroup();
     const s = await createStudent({ groupId: group._id });
     const agent = request.agent(app);
-    const login = await agent
-      .post(`/login/${s.token}`)
-      .type('form')
-      .send({ name: s.name, code: s.code });
+    const login = await agent.post(`/login/${s.token}`).type('form').send({ code: s.code });
     const first = sessionId(login);
     expect(first).not.toBe('');
 
@@ -209,12 +200,29 @@ describe('roles', () => {
     const s = await createStudent();
     const student = request.agent(app);
     await loginAsStudent(student, s);
-    for (const path of ['/admin', '/admin/students', '/admin/groups', '/admin/exercises'])
+    for (const path of [
+      '/admin',
+      '/admin/students',
+      '/admin/groups',
+      '/admin/exercises',
+      '/admin/help',
+    ])
       expect((await student.get(path)).status).toBe(403);
     const admin = request.agent(app);
     await loginAsAdmin(admin);
     expect((await admin.get('/exercises')).status).toBe(403);
     expect((await request(app).get('/exercises')).headers.location).toBe('/');
     expect((await request(app).get('/admin/exercises')).headers.location).toBe('/admin/login');
+    expect((await request(app).get('/admin/help')).headers.location).toBe('/admin/login');
+  });
+
+  it('admins have a help page linked from the menu, with the privacy section', async () => {
+    const admin = request.agent(app);
+    await loginAsAdmin(admin);
+    expect((await admin.get('/admin')).text).toContain('href="/admin/help"');
+    const res = await admin.get('/admin/help');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('id="confidentialite"');
+    expect(res.text).toContain('Confidentialité et sécurité');
   });
 });

@@ -14,11 +14,11 @@ declare module 'express-session' {
     // Date.now() when the session id was last issued; student sessions are reissued daily.
     renewedAt: number;
     flash: Flash;
-    // A CSV import waiting for the admin to decide about students with the same name.
+    // A CSV import waiting for the admin to decide about students with the same login.
     importDraft: {
       groupId: string;
-      rows: { line: number; name: string }[];
-      duplicates: { line: number; name: string }[];
+      rows: { line: number; login: string }[];
+      duplicates: { line: number; login: string }[];
       errors: { line: number; message: string }[];
     };
   }

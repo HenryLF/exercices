@@ -50,7 +50,7 @@ describe('exercise list', () => {
   });
 
   it('students without a class see a message', async () => {
-    const lone = await createStudent({ name: 'Sans Classe' });
+    const lone = await createStudent({ login: 'c.sans' });
     const a = request.agent(app);
     await loginAsStudent(a, lone);
     expect((await a.get('/exercises')).text).toContain('data-testid="no-group"');

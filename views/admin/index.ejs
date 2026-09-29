@@ -10,7 +10,7 @@
   <tbody>
   <% rows.forEach((r) => { %>
     <tr data-testid="student-row">
-      <td><a href="/admin/students/<%= r.id %>"><%= r.name %></a></td>
+      <td><a href="/admin/students/<%= r.id %>"><%= r.login %></a></td>
       <td><%= r.group || '—' %></td>
       <td class="num" data-testid="completed"><%= r.completed %>/<%= r.assigned %></td>
       <td class="num"><%= r.inProgress %></td>

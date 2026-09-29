@@ -20,12 +20,12 @@ export function csvHeader(blocks: readonly Block[]): string[] {
 /** One CSV record. Numbers stay numbers so spreadsheets read them as such. */
 export function csvRow(
   blocks: readonly Block[],
-  student: { name: string; group: string; seed: string | null },
+  student: { login: string; group: string; seed: string | null },
   summary: AttemptSummary,
   states: QuestionStates,
 ): (string | number)[] {
   const row: (string | number)[] = [
-    student.name,
+    student.login,
     student.group,
     student.seed ?? '',
     PROGRESS_LABELS[summary.progress],

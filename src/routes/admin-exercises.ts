@@ -168,8 +168,7 @@ async function resultRows(exercise: ExerciseDocument) {
     return [
       {
         id: s.id as string,
-        name: s.name,
-        nameKey: s.nameKey,
+        login: s.login,
         group: groupOf(s),
         seed: a.seed ?? null,
         summary: summarizeAttempt(blocksFor(exercise, a.seed), a, states),
@@ -182,8 +181,7 @@ async function resultRows(exercise: ExerciseDocument) {
     if (started.has(s.id as string) || !s.active) continue;
     rows.push({
       id: s.id as string,
-      name: s.name,
-      nameKey: s.nameKey,
+      login: s.login,
       group: groupOf(s),
       seed: null,
       summary: summarizeAttempt(template, null, {}),
@@ -193,7 +191,7 @@ async function resultRows(exercise: ExerciseDocument) {
   rows.sort(
     (a, b) =>
       a.group.localeCompare(b.group, 'fr') ||
-      a.nameKey.localeCompare(b.nameKey) ||
+      a.login.localeCompare(b.login) ||
       (a.summary.startedAt?.getTime() ?? 0) - (b.summary.startedAt?.getTime() ?? 0),
   );
   return { blocks: template, rows };

@@ -21,6 +21,7 @@
         <li><a href="/admin/exercises" <%- path.startsWith('/admin/exercises') ? 'aria-current="page"' : '' %>>Exercices</a></li>
         <li><a href="/admin/groups" <%- path.startsWith('/admin/groups') ? 'aria-current="page"' : '' %>>Classes</a></li>
         <li><a href="/admin/students" <%- path.startsWith('/admin/students') ? 'aria-current="page"' : '' %>>Élèves</a></li>
+        <li><a href="/admin/help" <%- path === '/admin/help' ? 'aria-current="page"' : '' %>>Aide</a></li>
       <% } else { %>
         <li><a href="/exercises" <%- path.startsWith('/exercises') ? 'aria-current="page"' : '' %>>Mes exercices</a></li>
       <% } %>

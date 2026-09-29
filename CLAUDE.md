@@ -100,8 +100,6 @@ supertest + mongodb-memory-server, ESLint 9 + Prettier) **plus**:
 | Package | Why |
 |---|---|
 | `markdown-it` | renders markdown blocks server-side; `html: false, linkify: false` so no raw HTML gets through |
-| `csv-parse` | parses the student import CSV (`csv-parse/sync`, files are small) |
-| `multer` (v2, memory storage) | receives the CSV upload on one route only |
 | `fflate` | pure-JS zip of the QR PNGs |
 | `seedrandom` | seeded PRNG so generated exercises are reproducible from their seed |
 
@@ -149,7 +147,7 @@ src/lib/qr.ts                    qrSignature, loginUrl, parseLoginToken, qrSvg, 
 src/lib/blocks.ts                Block types, keys, student view (answers stripped), editor parsing, edit rules
 src/lib/answers.ts               parseNumber, checkAnswer
 src/lib/markdown.ts              renderMarkdown (markdown-it, html off)
-src/lib/import-students.ts       CSV → rows → { created, skipped, errors } (pure parsing + a DB step)
+src/lib/import-students.ts       posted logins (zod) → plan: new / ask / already (pure)
 src/lib/zip.ts                   safeFileName, uniqueFileNames, zipFiles, attachment header
 src/lib/csv.ts                   results export rows (pure)
 src/lib/purge.ts                 purgeStudents: students, attempts, student sessions (+ classes)
@@ -161,9 +159,10 @@ src/lib/{names,dates,numbers,flash,http-error,validation}.ts   from pools
 src/routes/public.ts             /, /healthz, /login/:token, /admin/login, /logout
 src/routes/student.ts            /exercises, /exercises/next, /exercises/:id, question + tooltip POSTs
 src/routes/admin-students.ts     /admin (dashboard), /admin/students/*, QR page/PNG/regenerate, deactivate, delete
-src/routes/admin-import.ts       /admin/students/import: upload, then a question for same-name rows, confirm, cancel
+src/routes/admin-import.ts       /admin/students/import: posted logins, then a question for same-login rows, confirm, cancel
 src/routes/admin-groups.ts       /admin/groups/*, exercise assignment + order, qr.zip, printable sheet
 src/routes/admin-exercises.ts    /admin/exercises/*: custom editor, generate (templates), status, preview, results, CSV
+src/routes/admin-help.ts         /admin/help: admin guide (classes, students, exercises, results, privacy and security)
 src/routes/load.ts               loadStudent / loadGroup / loadExercise (404 on bad ids)
 views/partials/                  head (nav + flash), foot, form-error, status, progress, exercise-body
                                  (shared by student page and admin preview), group-filter, student-fields
@@ -171,9 +170,9 @@ views/{welcome,error,login-admin,login-student}.ejs
 views/student/                   exercises.ejs, exercise.ejs
 views/admin/                     index (per-student results), students, student, student-qr, import,
                                  groups, group, group-qr-sheet, exercises, exercise-edit, block-row,
-                                 generate, generate-billing, exercise-results, preview
+                                 generate, generate-billing, exercise-results, preview, help
 public/                          app.css, print.js, block-editor.js, autosubmit.js, exercise.js,
-                                 favicon.svg
+                                 import.js + import-csv.js (CSV → logins, in the browser), favicon.svg
 scripts/admin.ts                 from pools
 scripts/migrate.ts               npm run migrate: idempotent data migrations
 scripts/purge.ts                 npm run purge: end-of-year purge of students (dry run without --yes)
@@ -194,13 +193,13 @@ sample/                          the owner's reference files (PDF, screenshots);
 ```ts
 Admin    { username (unique, lowercase), passwordHash, authVersion }           // as pools
 Group    { name (unique, trimmed, ≤ 100), createdAt }                           // one class
-Student  { name, nameKey, groupIds: ObjectId[] (several classes, or none),
+Student  { login (unique, LOGIN_RE: m.alice), groupIds: ObjectId[] (several classes, or none),
            qrVersion: number (default 1), authVersion: number (default 1),
            failedAttempts, lockedUntil, lastLoginAt, lastSeenAt, active }
 session  { role: 'admin' | 'student', userId, authVersion, renewedAt: number (ms), flash? }
 ```
 
-Indexes: `Student { nameKey: 1 }`, `Student { groupIds: 1 }`, `Group { name: 1 } unique`.
+Indexes: `Student { login: 1 } unique`, `Student { groupIds: 1 }`, `Group { name: 1 } unique`.
 A student belongs to any number of groups, possibly none **(decided 2026-09-29; was one group)**.
 Changing a student's groups keeps their attempts. `npm run migrate` (`scripts/migrate.ts`,
 idempotent) converts old `groupId` documents; the dev database has been migrated.
@@ -216,9 +215,18 @@ idempotent) converts old `groupId` documents; the dev database has been migrated
 - **Regenerating** a QR code = `qrVersion += 1` and `authVersion += 1` (old QR dead, every
   session dropped). Also reactivates a deactivated student. **Deactivating** = `active: false`,
   `authVersion += 1`; attempts are kept; the QR gives 404 while inactive.
-- **Identity at login** = QR token + name + login code **(decided 2026-09-29; was the date of
-  birth, which is no longer stored)**. Name matched as in pools (`normalizeName` → `nameKey`).
-  The code is 6 digits derived like the token, `HMAC-SHA256(QR_SECRET, `code:${id}:${qrVersion}`)`
+- **The login is the only identity kept (decided 2026-09-29, late)**: no name, no date of
+  birth, anywhere on the server. It is the initial of the last name, a dot, then the first name,
+  lowercase, accents and spaces dropped (`MARTIN Alice` → `m.alice`, `MARTENS--BILONGO Carlos` →
+  `m.carlos`, `DE LA FONTAINE Jean-Pierre` → `d.jeanpierre`; leading all-capital words are the
+  last name, otherwise the last word is; a one-word name gives no dot), computed **in the admin's
+  browser** by `loginName` in `public/import-csv.js`, or typed by the admin for a single student.
+  `LOGIN_RE` in `names.ts`: `[a-z0-9]` with at most one inner dot, ≤ 40 characters. Logins are
+  unique: a taken one gets the first free number (`m.alice2`, `freeLogin` in `names.ts`,
+  `createStudentWithLogin` in the student model). Admin pages, results, the QR sheet, the zip's
+  file names and the CSV export show the login. The admin guide (`/admin/help`) explains it.
+- **Identity at login** = QR token + login code, nothing typed but the code **(decided
+  2026-09-29, late; was QR + name + code, before that the date of birth)**. The code is 6 digits derived like the token, `HMAC-SHA256(QR_SECRET, `code:${id}:${qrVersion}`)`
   → first 4 bytes mod 10⁶ (`loginCode` in `qr.ts`): never stored, printed on the QR page and
   sheet, put in the zip's file names, changed by regeneration. DB lockout: 5 failures → 15 min.
   Per-IP rate limit 20 / 15 min on both login POSTs. Both copied from pools.
@@ -243,8 +251,8 @@ idempotent) converts old `groupId` documents; the dev database has been migrated
 | Method, path | Who | Does |
 |---|---|---|
 | GET `/` | any | admin → `/admin`, student → `/exercises`, anonymous → welcome page ("scannez votre QR code") |
-| GET `/login/:token` | public | 404 page "QR code invalide" if the token doesn't verify; else name + code form |
-| POST `/login/:token` | public | identity check → session → redirect `/exercises/next` |
+| GET `/login/:token` | public | 404 page "QR code invalide" if the token doesn't verify; else code form |
+| POST `/login/:token` | public | code check → session → redirect `/exercises/next` |
 | GET/POST `/admin/login`, POST `/logout`, GET `/healthz` | | as pools |
 
 ---
@@ -488,28 +496,35 @@ CSV export per exercise (`src/lib/csv.ts`, UTF-8 with BOM, French headers, as po
   Assignment lives here, not on the exercise page **(decided 2026-09-28)**; ticking a draft opens
   it. The order is shared by all classes of the exercise. Also buttons **Télécharger les QR codes (zip)** and
   **Planche à imprimer**.
-- `/admin/students`: list filterable by group; create one (name, group) → redirects to the
+- `/admin/students`: list filterable by group; create one (login, groups) → redirects to the
   QR page; **Importer un CSV**.
-- `/admin/students/:id`: edit name / group, **QR code** (always available), regenerate,
-  deactivate. `/admin/students/:id/qr` shows the QR (SVG) + login URL + name, printable;
+- `/admin/students/:id`: edit login / groups, **QR code** (always available), regenerate,
+  deactivate. `/admin/students/:id/qr` shows the QR (SVG) + login URL + login + code, printable;
   `/admin/students/:id/qr.png` serves the PNG.
-- **CSV import** (`/admin/students/import`, GET form + POST multipart): one file ≤ 2 MB, the
+- **CSV import** (`/admin/students/import`): the file is **read in the browser** by
+  `public/import.js` + `public/import-csv.js` (the file input has no `name`, so it is never
+  uploaded) and only `{ rows: {line, login}[], duplicates, errors }` is posted as JSON in the
+  `payload` field, checked by `importPayloadSchema` (logins must match `LOGIN_RE`). Needs
+  JavaScript; without it the page says so. One file ≤ 2 MB (checked in the browser), the
   target group chosen in the form. Format = the school software's export (`EXPORT_CSV` in
   `tests/helpers.ts`): header row, comma delimiter (also accept `;`, detected on the header
-  line), UTF-8 with or without BOM. Only the `Élèves` column is used (found by header name after
-  `normalizeName`); every other column (`Né(e) le`, `Classe de rattachement`, `Sexe`, options…)
+  line), UTF-8 with or without BOM. Only the `Élèves` column is used (found by header name);
+  every other column (`Né(e) le`, `Classe de rattachement`, `Sexe`, options…)
   is ignored and never stored. The class column is empty in real exports, which is why the group
-  is chosen in the form. Rows are deduplicated on `nameKey` inside the file (exports repeat the
-  same pupil) and matched by name against the database (see the import notes in section 9).
+  is chosen in the form. Rows are deduplicated on the full name inside the file, in the browser
+  (exports repeat the same pupil); two different pupils with the same login are two rows. Rows
+  are matched against existing students with the same base login (`m.alice`, `m.alice2`...): as
+  many as there are in the class are taken to be them, other rows ask when some exist in other
+  classes, the rest are created with a free login (see the import notes in section 9).
   The result page lists created, skipped (with reason) and rejected lines (line number +
   message). Nothing is written when the header lacks the name column.
 - **QR zip** (`/admin/groups/:id/qr.zip`): one PNG per active student of the group,
   `QRCode.toBuffer(loginUrl, { type: 'png', width: 512, margin: 2 })`, zipped with `fflate`,
-  file name `<Student name>.png` (NFC, characters `/\:*?"<>|` removed, spaces collapsed,
+  file name `<login> - <code>.png` (NFC, characters `/\:*?"<>|` removed, spaces collapsed,
   ` (2)` suffix on collision), zip named `<group>-qr.zip`, `Content-Disposition: attachment`.
-  The name is in the file name only; drawing it inside the image would need a native raster
-  library (open question 10.3). The printable sheet (`/admin/groups/:id/qr`) puts QR + name on
-  paper, six cards per A4 page, via `print.js` and `@media print` CSS.
+  The login is in the file name only; drawing it inside the image would need a native raster
+  library (open question 10.3). The printable sheet (`/admin/groups/:id/qr`) puts QR + login +
+  code on paper, six cards per A4 page, via `print.js` and `@media print` CSS.
 
 ### 8.3 Exercises
 
@@ -534,7 +549,7 @@ CSV export per exercise (`src/lib/csv.ts`, UTF-8 with BOM, French headers, as po
 |---|---|
 | GET `/exercises`, GET `/exercises/next`, GET `/exercises/:id` | student |
 | POST `/exercises/:id/questions/:key`, POST `/exercises/:id/questions/:key/tooltip` | student |
-| GET `/admin` | admin |
+| GET `/admin`, GET `/admin/help` | admin |
 | GET/POST `/admin/groups`, GET/POST `/admin/groups/:id`, GET `/admin/groups/:id/qr`, GET `/admin/groups/:id/qr.zip` | admin |
 | GET/POST `/admin/students`, GET/POST `/admin/students/import`, GET/POST `/admin/students/:id` | admin |
 | GET `/admin/students/:id/qr`, GET `/admin/students/:id/qr.png`, POST `/admin/students/:id/qr`, POST `/admin/students/:id/deactivate` | admin |
@@ -600,17 +615,24 @@ deviated from the plan.
   behind a confirmation page (`views/admin/confirm-delete.ejs`) listing the consequences:
   deleting a student or an exercise deletes its attempts; deleting a class only removes it from
   its students and exercises. Students have `groupIds` (0..n classes). The CSV import is two
-  steps when a row's name (via `nameKey`) matches existing students: the rows wait in
+  steps when a row's login matches existing students (was the name, see below): the rows wait in
   `session.importDraft` and the admin chooses, per row, an existing student (added to the class,
-  same QR code and results) or a new one; the oldest student with that name is suggested, and a
-  row whose name is already in the class is skipped; nothing is written before the answer. Radio names are
+  same QR code and results) or a new one; the oldest student with that login is suggested, and a
+  row whose login is already in the class is skipped; nothing is written before the answer. Radio names are
   `choice[L<line>]`: numeric keys would make qs build a compacted array.
 - **Data minimisation (2026-09-29, night)**, for GDPR (pupils are minors): the date of birth is
-  gone from the model, forms, import and login; students sign in with QR + name + a 6-digit
+  gone from the model, forms, import and login; students sign in with QR + login + a 6-digit
   code derived from the QR (5.2). `npm run migrate` unsets `dob` on old documents (not yet run
   on the dev database). `npm run purge` deletes every student, attempt and student session at
   the end of the year (`--with-groups` also deletes classes); dry run without `--yes`. The
   import tests use an inline fixture (`EXPORT_CSV`) since `sample/` was removed.
+- **Login only (2026-09-29, late)**: names are gone too (5.2). The server keeps a unique login
+  per student; the CSV is read in the browser so names never reach it; `csv-parse` and `multer`
+  were removed. Students sign in with QR + code only. `npm run migrate` gives each old student
+  `freeLogin(loginName(name))` (oldest first), unsets `name` and `nameKey` and drops the
+  `nameKey_1` index. `tsconfig` has `allowJs` so the migration and tests import
+  `public/import-csv.js`. Same evening the format became `m.alice` (initial, dot, first name)
+  instead of `alicem`; `npm run migrate` only converts students that still have a `name`.
 - **Change of 2026-09-29**: `allowRetry` per exercise. The product and VAT-rate options were
   removed from the code, and `generated.params.productId` / `tvaRegime` were unset in the dev
   database. No attempt depended on them (the one exercise fixing a rate had no attempts).
@@ -796,8 +818,8 @@ deviated from the plan.
    and is a small follow-up.
 4. **Tolerance**: answers are exact, but cent rounding differs between students. Default: the
    billing generator sets `tolerance: 0.01`; custom questions default to `0`, editable.
-5. **Identity at login**: QR + name + login code (5.2). If the owner wants QR only, drop the
-   form in `student-login.ts` and its tests; nothing else changes.
+5. **Identity at login**: QR + login code (5.2). If the owner wants QR only, drop the form in
+   `student-login.ts` and its tests; nothing else changes.
 6. **Class column in the CSV**: empty in the sample, so the group is chosen at import. If a
    future export fills `Classe de rattachement`, offer "use the file's class" as an option.
 7. **Justification part (PDF part 2)**: paper only in v1.

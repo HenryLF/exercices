@@ -19,6 +19,7 @@ import { adminImportRouter } from './routes/admin-import.js';
 import { adminStudentsRouter } from './routes/admin-students.js';
 import { adminGroupsRouter } from './routes/admin-groups.js';
 import { adminExercisesRouter } from './routes/admin-exercises.js';
+import { adminHelpRouter } from './routes/admin-help.js';
 
 export const PICO_CSS = 'https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css';
 
@@ -99,6 +100,7 @@ export function createApp(options: AppOptions = {}) {
   app.use(adminStudentsRouter());
   app.use(adminGroupsRouter());
   app.use(adminExercisesRouter());
+  app.use(adminHelpRouter());
 
   app.use((_req, _res, next) => next(notFound()));
 

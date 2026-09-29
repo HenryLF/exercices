@@ -11,13 +11,15 @@ import {
   signatureMatches,
 } from '../../src/lib/qr.js';
 import {
-  parseStudentsCsv,
+  parseImportPayload,
   planImport,
   resolveChoice,
+  sameBase,
   type RowPlan,
 } from '../../src/lib/import-students.js';
 import { attachment, safeFileName, uniqueFileNames, zipFiles } from '../../src/lib/zip.js';
-import { normalizeName } from '../../src/lib/names.js';
+import { freeLogin } from '../../src/lib/names.js';
+import { loginKey, loginName, readExport } from '../../public/import-csv.js';
 import { EXPORT_CSV } from '../helpers.js';
 
 const ID = '0123456789abcdef01234567';
@@ -50,35 +52,73 @@ describe('QR tokens', () => {
   );
 });
 
-describe('parseStudentsCsv', () => {
+describe('readExport (runs in the browser)', () => {
   it('reads the school software export: one pupil repeated 15 times', () => {
-    const r = parseStudentsCsv(EXPORT_CSV);
+    const r = readExport(EXPORT_CSV);
     expect(r.fatal).toBeUndefined();
-    expect(r.rows).toEqual([{ line: 2, name: 'Alice Martin' }]);
+    expect(r.rows).toEqual([{ line: 2, login: 'm.alice' }]);
     expect(r.duplicates).toHaveLength(14);
     expect(r.errors).toEqual([]);
+    // Only logins come out: no name, no other column.
+    expect(JSON.stringify(r)).not.toMatch(/Martin|2000/);
   });
 
   it('accepts semicolons, a BOM, quotes and reports bad lines', () => {
     const csv =
       '﻿Nom;"Né(e) le";Classe\n' +
-      '"Dupont, Jean";01/02/2009;2A\n' +
-      'Zoé Durand;;2A\n' +
+      '"DUPONT; Jean ""Jo""";01/02/2009;2A\n' +
+      'DURAND Zoé;;2A\r\n' +
       ';01/01/2009;2A\n' +
-      'zoe  DURAND;02/02/2010;2A\n' +
+      'DURAND  zoé;02/02/2010;2A\n' +
+      'DUVAL Zoé;;2A\n' +
       ';;\n';
-    const r = parseStudentsCsv(csv);
-    expect(r.rows.map((x) => x.name)).toEqual(['Dupont, Jean', 'Zoé Durand']);
+    const r = readExport(csv);
+    expect(r.rows).toEqual([
+      { line: 2, login: 'd.jeanjo' },
+      { line: 3, login: 'd.zoe' },
+      { line: 6, login: 'd.zoe' },
+    ]);
     expect(r.errors.map((e) => e.line)).toEqual([4]);
-    expect(r.duplicates.map((d) => d.line)).toEqual([5]);
+    expect(r.duplicates).toEqual([{ line: 5, login: 'd.zoe' }]);
   });
 
   it('is fatal without a name column', () => {
-    expect(parseStudentsCsv('Prénom,Classe\nA,B\n').fatal).toMatch(/Colonne introuvable/);
+    expect(readExport('Prénom,Classe\nA,B\n').fatal).toMatch(/Colonne introuvable/);
   });
 
-  it('normalizeName ignores case, accents, hyphens and spacing', () => {
-    expect(normalizeName('  Élodie-Anne  MARTIN ')).toBe(normalizeName('elodie anne martin'));
+  it('loginName is the initial of the last name, a dot, then the first name', () => {
+    expect(loginName('MARTIN Alice')).toBe('m.alice');
+    expect(loginName('MARTENS--BILONGO Carlos')).toBe('m.carlos');
+    expect(loginName('DE LA FONTAINE Jean-Pierre')).toBe('d.jeanpierre');
+    expect(loginName('ÉTIENNE Zoé Anne')).toBe('e.zoeanne');
+    expect(loginName('Alice Martin')).toBe('m.alice');
+    expect(loginName('ALICE MARTIN')).toBe('a.martin');
+    expect(loginName('Parti')).toBe('parti');
+    expect(loginKey(' Alice-M ')).toBe('alicem');
+  });
+});
+
+describe('logins on the server', () => {
+  it('freeLogin adds the first free number', () => {
+    expect(freeLogin('m.alice', new Set())).toBe('m.alice');
+    expect(freeLogin('m.alice', new Set(['m.alice', 'm.alice2']))).toBe('m.alice3');
+  });
+
+  it('sameBase matches numeric suffixes only', () => {
+    expect(sameBase('m.alice2', 'm.alice')).toBe(true);
+    expect(sameBase('m.alice', 'm.alice')).toBe(true);
+    expect(sameBase('m.alicea', 'm.alice')).toBe(false);
+  });
+
+  it('parseImportPayload refuses anything but logins', () => {
+    const ok = { rows: [{ line: 2, login: 'm.alice' }], duplicates: [], errors: [] };
+    expect(parseImportPayload(JSON.stringify(ok))).toEqual(ok);
+    for (const login of ['Alice Martin', 'm..alice', 'm.a.lice', '.alice', 'x'.repeat(41)]) {
+      const bad = { ...ok, rows: [{ line: 2, login }] };
+      expect(parseImportPayload(JSON.stringify(bad))).toBeNull();
+    }
+    expect(parseImportPayload('{')).toBeNull();
+    expect(parseImportPayload(undefined)).toBeNull();
   });
 });
 
@@ -107,27 +147,28 @@ describe('zip helpers', () => {
 describe('planImport', () => {
   const G = 'g1';
   const existing = [
-    { id: 'a', name: 'Alice Martin', groupIds: ['g0'] },
-    { id: 'b', name: 'Alice MARTIN', groupIds: [] },
-    { id: 'c', name: 'Zoé Petit', groupIds: [G] },
+    { id: 'a', login: 'm.alice', groupIds: ['g0'] },
+    { id: 'b', login: 'm.alice2', groupIds: [] },
+    { id: 'c', login: 'p.zoe', groupIds: [G] },
   ];
-  const row = (line: number, name: string) => ({ line, name });
+  const row = (line: number, login: string) => ({ line, login });
 
   it('sorts rows into new, ask and already', () => {
     const plans = planImport(
-      [row(2, 'alice martin'), row(3, 'Zoe Petit'), row(4, 'Nouveau')],
+      [row(2, 'm.alice'), row(3, 'p.zoe'), row(4, 'v.nouveau'), row(5, 'p.zoe')],
       existing,
       G,
     );
-    expect(plans.map((p) => p.kind)).toEqual(['ask', 'already', 'new']);
+    // The second p.zoe of the file is another pupil: the class has only one.
+    expect(plans.map((p) => p.kind)).toEqual(['ask', 'already', 'new', 'new']);
     const [same] = plans as [RowPlan & { kind: 'ask' }];
     expect(same.candidates.map((c) => c.id)).toEqual(['a', 'b']);
-    // The oldest student with this name is suggested.
+    // The oldest student with this login is suggested.
     expect(same.suggested).toBe('a');
   });
 
   it('resolveChoice accepts only new or a candidate', () => {
-    const [p] = planImport([row(2, 'Alice Martin')], existing, G) as [RowPlan & { kind: 'ask' }];
+    const [p] = planImport([row(2, 'm.alice')], existing, G) as [RowPlan & { kind: 'ask' }];
     expect(resolveChoice(p, 'new')).toBe('new');
     expect(resolveChoice(p, 'b')).toBe('b');
     expect(resolveChoice(p, 'c')).toBe('a');

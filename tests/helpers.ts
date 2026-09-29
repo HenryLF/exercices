@@ -39,27 +39,21 @@ export async function createGroup(name = '2nde MRC') {
 
 export async function createStudent(
   opts: {
-    name?: string;
+    login?: string;
     /** Shortcut for one class. */
     groupId?: mongoose.Types.ObjectId | null;
     groupIds?: mongoose.Types.ObjectId[];
   } = {},
 ) {
-  const name = opts.name ?? 'Élodie Martin';
+  const login = opts.login ?? 'm.elodie';
   const groupIds = opts.groupIds ?? (opts.groupId ? [opts.groupId] : []);
-  const student = await Student.create({ name, groupIds });
+  const student = await Student.create({ login, groupIds });
   const ref = { id: student.id as string, qrVersion: student.qrVersion };
-  return { student, token: loginToken(ref), name, code: loginCode(ref) };
+  return { student, token: loginToken(ref), login, code: loginCode(ref) };
 }
 
-export async function loginAsStudent(
-  agent: Agent,
-  s: { token: string; name: string; code: string },
-) {
-  const res = await agent
-    .post(`/login/${s.token}`)
-    .type('form')
-    .send({ name: s.name, code: s.code });
+export async function loginAsStudent(agent: Agent, s: { token: string; code: string }) {
+  const res = await agent.post(`/login/${s.token}`).type('form').send({ code: s.code });
   expect(res.status).toBe(302);
   expect(res.headers.location).toBe('/exercises/next');
 }

@@ -493,8 +493,8 @@ describe('generated exercises', () => {
 describe('results export', () => {
   it('exports a CSV per exercise with French headers, BOM and oui/non columns', async () => {
     const group = await createGroup('2nde A');
-    const s = await createStudent({ name: 'Élodie Martin', groupId: group._id });
-    await createStudent({ name: 'Bruno Petit', groupId: group._id });
+    const s = await createStudent({ login: 'm.elodie', groupId: group._id });
+    await createStudent({ login: 'p.bruno', groupId: group._id });
     const ex = await createExercise({ groupIds: [group._id] });
     const [remise] = questionBlocks(plainBlocks(ex));
     await Attempt.create({
@@ -516,11 +516,11 @@ describe('results export', () => {
       'Élève,Classe,Tirage,Statut,Questions résolues,Commencé le (UTC),Terminé le (UTC),Remise – essais,Remise – indice,Remise – résolu,Taux – essais,Taux – indice,Taux – résolu',
     );
     expect(lines).toHaveLength(3);
-    expect(lines.find((l) => l.startsWith('Élodie'))).toMatch(
-      /^Élodie Martin,2nde A,,En cours,1,.+,,1,oui,oui,0,non,non$/,
+    expect(lines.find((l) => l.startsWith('m.elodie'))).toMatch(
+      /^m\.elodie,2nde A,,En cours,1,.+,,1,oui,oui,0,non,non$/,
     );
-    expect(lines.find((l) => l.startsWith('Bruno'))).toBe(
-      'Bruno Petit,2nde A,,À faire,0,,,0,non,non,0,non,non',
+    expect(lines.find((l) => l.startsWith('p.bruno'))).toBe(
+      'p.bruno,2nde A,,À faire,0,,,0,non,non,0,non,non',
     );
   });
 });

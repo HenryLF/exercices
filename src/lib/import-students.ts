@@ -1,74 +1,30 @@
-import { parse } from 'csv-parse/sync';
-import { normalizeName } from './names.js';
+import { z } from 'zod';
+import { LOGIN_RE } from './names.js';
 
-// Format of sample/Export CSV.csv (school software export): a header row, then one row per pupil.
-// Only the name column is used, found by header name. Every other column (date of birth, sex,
-// options...) is ignored and never stored: the app keeps as little personal data as possible.
-const NAME_HEADERS = ['eleves', 'eleve', 'nom', 'nomprenom', 'nometprenom'];
+// The CSV is read in the admin's browser (public/import-csv.js): the server only ever receives
+// logins, never names. This is the shape the browser posts.
+const MAX_ROWS = 3000;
+const line = z.number().int().min(1);
+const login = z.string().regex(LOGIN_RE);
 
-const headerKey = (h: string) => normalizeName(h).replace(/[^a-z0-9]/g, '');
+export const importPayloadSchema = z.object({
+  rows: z.array(z.object({ line, login })).max(MAX_ROWS),
+  duplicates: z.array(z.object({ line, login })).max(MAX_ROWS),
+  errors: z.array(z.object({ line, message: z.string().max(100) })).max(MAX_ROWS),
+});
 
-export interface ImportRow {
-  line: number;
-  name: string;
-}
+export type ImportPayload = z.infer<typeof importPayloadSchema>;
+export type ImportRow = ImportPayload['rows'][number];
 
-export interface ParsedImport {
-  rows: ImportRow[];
-  duplicates: { line: number; name: string }[];
-  errors: { line: number; message: string }[];
-  /** Set when the file can't be used at all; nothing is imported. */
-  fatal?: string;
-}
-
-export function parseStudentsCsv(input: Buffer | string): ParsedImport {
-  const text = (typeof input === 'string' ? input : input.toString('utf8')).replace(/^\uFEFF/, '');
-  const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
-  const delimiter =
-    (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ';' : ',';
-
-  let records: string[][];
+/** The posted JSON, or null when it isn't a valid payload. */
+export function parseImportPayload(raw: unknown): ImportPayload | null {
+  if (typeof raw !== 'string') return null;
   try {
-    records = parse(text, {
-      delimiter,
-      relax_column_count: true,
-      relax_quotes: true,
-      skip_empty_lines: true,
-      trim: true,
-    }) as string[][];
+    const parsed = importPayloadSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
   } catch {
-    return { rows: [], duplicates: [], errors: [], fatal: 'Le fichier n’est pas un CSV lisible.' };
+    return null;
   }
-
-  const header = (records[0] ?? []).map(headerKey);
-  const nameCol = header.findIndex((h) => NAME_HEADERS.includes(h));
-  if (nameCol < 0) {
-    return {
-      rows: [],
-      duplicates: [],
-      errors: [],
-      fatal: 'Colonne introuvable\u00a0: le fichier doit avoir une colonne «\u00a0Élèves\u00a0».',
-    };
-  }
-
-  const rows: ImportRow[] = [];
-  const duplicates: ParsedImport['duplicates'] = [];
-  const errors: ParsedImport['errors'] = [];
-  const seen = new Set<string>();
-  records.slice(1).forEach((rec, i) => {
-    const line = i + 2;
-    const name = (rec[nameCol] ?? '').replace(/\s+/g, ' ').trim();
-    if (!name) {
-      if (rec.some((cell) => cell.trim())) errors.push({ line, message: 'nom manquant' });
-      return;
-    }
-    if (name.length > 200) return errors.push({ line, message: 'nom trop long' });
-    const key = normalizeName(name);
-    if (seen.has(key)) return duplicates.push({ line, name });
-    seen.add(key);
-    rows.push({ line, name });
-  });
-  return { rows, duplicates, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -76,16 +32,22 @@ export function parseStudentsCsv(input: Buffer | string): ParsedImport {
 
 export interface Candidate {
   id: string;
-  name: string;
+  login: string;
   groupIds: string[];
 }
 
+/** Whether `login` is `base` or `base` with a numeric suffix (m.alice, m.alice2...). */
+export const sameBase = (login: string, base: string) =>
+  login === base || (login.startsWith(base) && /^\d+$/.test(login.slice(base.length)));
+
 /**
- * What to do with one CSV row:
- * - `new`: nobody has this name, a student is created in the class;
- * - `ask`: students with the same name exist, none in the class; the admin picks one of them
- *   (added to the class) or a new student; `suggested` is the oldest of them;
- * - `already`: a student with this name is already in the class.
+ * What to do with one CSV row. Different pupils can share a login, so existing students with the
+ * same base login (m.alice, m.alice2...) are only possibly the same person:
+ * - `already`: as many rows as there are such students in the class are taken to be them;
+ * - `ask`: other rows, when such students exist outside the class; the admin picks one of them
+ *   (added to the class) or a new student; `suggested` is the oldest;
+ * - `new`: nobody has this login, a student is created (with a free suffix if needed).
+ * `existing` must be sorted oldest first.
  */
 export type RowPlan =
   | { kind: 'new'; row: ImportRow }
@@ -93,17 +55,17 @@ export type RowPlan =
   | { kind: 'already'; row: ImportRow; candidate: Candidate };
 
 export function planImport(rows: ImportRow[], existing: Candidate[], groupId: string): RowPlan[] {
-  const byName = new Map<string, Candidate[]>();
-  for (const c of existing) {
-    const key = normalizeName(c.name);
-    byName.set(key, [...(byName.get(key) ?? []), c]);
-  }
+  const seen = new Map<string, number>();
   return rows.map((row): RowPlan => {
-    const candidates = byName.get(normalizeName(row.name)) ?? [];
-    if (candidates.length === 0) return { kind: 'new', row };
-    const inClass = candidates.find((c) => c.groupIds.includes(groupId));
-    if (inClass) return { kind: 'already', row, candidate: inClass };
-    return { kind: 'ask', row, candidates, suggested: candidates[0]!.id };
+    const matches = existing.filter((c) => sameBase(c.login, row.login));
+    const inClass = matches.filter((c) => c.groupIds.includes(groupId));
+    const others = matches.filter((c) => !c.groupIds.includes(groupId));
+    const n = seen.get(row.login) ?? 0;
+    seen.set(row.login, n + 1);
+    const here = inClass[n];
+    if (here) return { kind: 'already', row, candidate: here };
+    if (others.length === 0) return { kind: 'new', row };
+    return { kind: 'ask', row, candidates: others, suggested: others[0]!.id };
   });
 }
 

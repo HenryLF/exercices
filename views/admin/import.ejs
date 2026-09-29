@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <h1>Importer des élèves</h1>
-<p>Le fichier est l’export CSV du logiciel de vie scolaire&nbsp;: une ligne d’en-tête, puis une ligne par élève. Seule la colonne <strong>Élèves</strong> est lue&nbsp;; les autres (date de naissance, sexe, options…) sont ignorées et ne sont pas enregistrées. Si un nom correspond à un élève déjà enregistré, vous choisirez avant l’import de réutiliser cet élève (il est ajouté à la classe) ou d’en créer un nouveau.</p>
+<p>Le fichier est l’export CSV du logiciel de vie scolaire&nbsp;: une ligne d’en-tête, puis une ligne par élève. Le fichier est lu par votre navigateur et n’est pas envoyé&nbsp;: seule la colonne <strong>Élèves</strong> est lue, et chaque nom devient un identifiant (initiale du nom, un point, puis le prénom&nbsp;: MARTIN Alice → m.alice). Seuls ces identifiants sont envoyés et enregistrés&nbsp;; aucun nom ni autre colonne ne quitte votre ordinateur. Un identifiant déjà pris reçoit un chiffre (m.alice2). Si un identifiant correspond à un élève d’une autre classe, vous choisirez avant l’import s’il s’agit du même élève (il est ajouté à la classe) ou d’un nouveau.</p>
 <% if (error) { %><p class="flash flash-error" role="alert" data-testid="form-error"><%= error %></p><% } %>
 <% if (result) { %>
   <article data-testid="import-result">
@@ -10,17 +10,17 @@
       à <%= result.groupName %>.
     </p>
     <% if (result.created.length > 0) { %>
-      <details open><summary>Créés</summary><ul><% result.created.forEach((s) => { %><li><a href="/admin/students/<%= s.id %>"><%= s.name %></a></li><% }) %></ul></details>
+      <details open><summary>Créés</summary><ul><% result.created.forEach((s) => { %><li><a href="/admin/students/<%= s.id %>"><%= s.login %></a></li><% }) %></ul></details>
     <% } %>
     <% if (result.added.length > 0) { %>
-      <details open><summary>Élèves existants ajoutés à la classe</summary><ul><% result.added.forEach((s) => { %><li>Ligne <%= s.line %>&nbsp;: <a href="/admin/students/<%= s.id %>"><%= s.name %></a></li><% }) %></ul></details>
+      <details open><summary>Élèves existants ajoutés à la classe</summary><ul><% result.added.forEach((s) => { %><li>Ligne <%= s.line %>&nbsp;: <a href="/admin/students/<%= s.id %>"><%= s.login %></a></li><% }) %></ul></details>
     <% } %>
     <% if (result.already.length > 0) { %>
-      <details><summary><span data-testid="already-count"><%= result.already.length %></span> déjà dans la classe</summary><ul><% result.already.forEach((s) => { %><li>Ligne <%= s.line %>&nbsp;: <a href="/admin/students/<%= s.id %>"><%= s.name %></a></li><% }) %></ul></details>
+      <details><summary><span data-testid="already-count"><%= result.already.length %></span> déjà dans la classe</summary><ul><% result.already.forEach((s) => { %><li>Ligne <%= s.line %>&nbsp;: <a href="/admin/students/<%= s.id %>"><%= s.login %></a></li><% }) %></ul></details>
     <% } %>
     <% if (result.skipped.length > 0) { %>
       <details><summary><span data-testid="skipped-count"><%= result.skipped.length %></span> ignoré<%= result.skipped.length > 1 ? 's' : '' %></summary>
-        <ul><% result.skipped.forEach((s) => { %><li>Ligne <%= s.line %>&nbsp;: <%= s.name %> — <%= s.reason %></li><% }) %></ul></details>
+        <ul><% result.skipped.forEach((s) => { %><li>Ligne <%= s.line %>&nbsp;: <%= s.login %> — <%= s.reason %></li><% }) %></ul></details>
     <% } %>
     <% if (result.errors.length > 0) { %>
       <details open><summary><span data-testid="error-count"><%= result.errors.length %></span> ligne<%= result.errors.length > 1 ? 's' : '' %> rejetée<%= result.errors.length > 1 ? 's' : '' %></summary>
@@ -32,7 +32,9 @@
 <% if (groups.length === 0) { %>
   <p>Créez d’abord une <a href="/admin/groups">classe</a>.</p>
 <% } else { %>
-<form method="post" action="/admin/students/import" enctype="multipart/form-data" data-testid="import-form">
+<noscript><p class="flash flash-error">L’import a besoin de JavaScript&nbsp;: le fichier est lu dans votre navigateur pour que les noms ne soient jamais envoyés.</p></noscript>
+<p class="flash flash-error" role="alert" id="import-error" hidden></p>
+<form method="post" action="/admin/students/import" id="import-form" data-testid="import-form">
   <label>Classe
     <select name="groupId" required>
       <option value="">Choisir…</option>
@@ -40,9 +42,11 @@
     </select>
   </label>
   <label>Fichier CSV (2&nbsp;Mo au plus)
-    <input type="file" name="file" accept=".csv,text/csv" required>
+    <input type="file" id="import-file" accept=".csv,text/csv" required>
   </label>
+  <input type="hidden" name="payload" id="import-payload">
   <button type="submit">Importer</button>
 </form>
 <% } %>
+<script type="module" src="/import.js"></script>
 <%- include('../partials/foot') %>

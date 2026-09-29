@@ -1,25 +1,25 @@
 <%- include('../partials/head') %>
 <h1>Élèves déjà enregistrés</h1>
-<p>Des élèves du fichier portent le même nom qu’un élève déjà enregistré. Pour chacun, choisissez s’il s’agit de la même personne (elle est ajoutée à <strong><%= groupName %></strong> et garde son QR code et ses résultats) ou d’un nouvel élève.</p>
+<p>Des élèves du fichier ont le même identifiant qu’un élève déjà enregistré dans une autre classe. Pour chacun, choisissez s’il s’agit de la même personne (elle est ajoutée à <strong><%= groupName %></strong> et garde son QR code et ses résultats) ou d’un nouvel élève.</p>
 <p><small>
-  <%= newCount %> nouvel<%= newCount > 1 ? 's' : '' %> élève<%= newCount > 1 ? 's' : '' %> sans homonyme <%= newCount > 1 ? 'seront créés' : 'sera créé' %>.
+  <%= newCount %> nouvel<%= newCount > 1 ? 's' : '' %> élève<%= newCount > 1 ? 's' : '' %> sans identifiant commun <%= newCount > 1 ? 'seront créés' : 'sera créé' %>.
   <% if (alreadyCount > 0) { %><%= alreadyCount %> élève<%= alreadyCount > 1 ? 's sont' : ' est' %> déjà dans la classe.<% } %>
   Rien n’est enregistré avant la validation.
 </small></p>
 <form method="post" action="/admin/students/import/confirm" data-testid="import-confirm">
   <% asks.forEach((a) => { %>
     <fieldset class="question" data-testid="ask-<%= a.line %>">
-      <legend>Ligne <%= a.line %>&nbsp;: <%= a.name %></legend>
+      <legend>Ligne <%= a.line %>&nbsp;: <%= a.login %></legend>
       <% a.candidates.forEach((c) => { %>
         <label>
           <input type="radio" name="choice[L<%= a.line %>]" value="<%= c.id %>" <%- a.suggested === c.id ? 'checked' : '' %>>
-          Utiliser l’élève existant <strong><%= c.name %></strong>
+          Utiliser l’élève existant <strong><%= c.login %></strong>
           <small>— <%= c.groups.length > 0 ? c.groups.join(', ') : 'sans classe' %> · <a href="/admin/students/<%= c.id %>" target="_blank" rel="noopener">voir</a></small>
         </label>
       <% }) %>
       <label>
         <input type="radio" name="choice[L<%= a.line %>]" value="new" <%- a.suggested === 'new' ? 'checked' : '' %>>
-        Créer un nouvel élève (nouveau QR code)
+        Créer un nouvel élève (nouveau QR code, identifiant suivi d’un chiffre)
       </label>
     </fieldset>
   <% }) %>

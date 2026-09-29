@@ -1,41 +1,36 @@
-import { Router, type NextFunction, type Request, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import mongoose from 'mongoose';
-import multer from 'multer';
 import { requireRole } from '../auth/middleware.js';
 import { Group } from '../models/group.js';
-import { Student } from '../models/student.js';
+import { createStudentWithLogin, Student } from '../models/student.js';
 import { setFlash } from '../lib/flash.js';
 import {
-  parseStudentsCsv,
+  parseImportPayload,
   planImport,
   resolveChoice,
   type ImportRow,
   type RowPlan,
 } from '../lib/import-students.js';
-import { normalizeName } from '../lib/names.js';
 import { groupNames } from './load.js';
-
-const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_IMPORT_BYTES, files: 1 },
-});
 
 type Draft = NonNullable<Request['session']['importDraft']>;
 
 /** Current plan for the draft's rows: the database may have changed since the upload. */
 async function plan(rows: ImportRow[], groupId: string): Promise<RowPlan[]> {
-  const nameKeys = [...new Set(rows.map((r) => normalizeName(r.name)))];
-  const existing = await Student.find(
-    { nameKey: { $in: nameKeys } },
-    { name: 1, groupIds: 1 },
-  ).sort({ createdAt: 1 });
+  // Logins are [a-z0-9] with at most one dot (checked by the payload schema): only the dot needs
+  // escaping inside a regex.
+  const bases = [...new Set(rows.map((r) => r.login))];
+  const existing = bases.length
+    ? await Student.find(
+        { login: { $regex: `^(${bases.map((b) => b.replace('.', '\\.')).join('|')})\\d*$` } },
+        { login: 1, groupIds: 1 },
+      ).sort({ createdAt: 1 })
+    : [];
   return planImport(
     rows,
     existing.map((s) => ({
       id: s.id as string,
-      name: s.name,
+      login: s.login,
       groupIds: s.groupIds.map(String),
     })),
     groupId,
@@ -45,23 +40,27 @@ async function plan(rows: ImportRow[], groupId: string): Promise<RowPlan[]> {
 /** Creates the new students and adds the chosen existing ones to the class. */
 async function apply(draft: Draft, plans: RowPlan[], choices: Record<string, unknown>) {
   const names = await groupNames();
-  const created: { id: string; name: string }[] = [];
-  const added: { id: string; name: string; line: number }[] = [];
-  const already: { id: string; name: string; line: number }[] = [];
+  const created: { id: string; login: string }[] = [];
+  const added: { id: string; login: string; line: number }[] = [];
+  const already: { id: string; login: string; line: number }[] = [];
+  const used = new Set<string>();
   for (const p of plans) {
     if (p.kind === 'already') {
-      already.push({ id: p.candidate.id, name: p.candidate.name, line: p.row.line });
+      already.push({ id: p.candidate.id, login: p.candidate.login, line: p.row.line });
       continue;
     }
     // Keys are `L<line>`: purely numeric keys would make qs build a compacted array.
-    const choice = p.kind === 'ask' ? resolveChoice(p, choices[`L${p.row.line}`]) : 'new';
+    let choice = p.kind === 'ask' ? resolveChoice(p, choices[`L${p.row.line}`]) : 'new';
+    // One existing student can stand for one row only; a second row is a different pupil.
+    if (used.has(choice)) choice = 'new';
     if (choice === 'new') {
-      const s = await Student.create({ name: p.row.name, groupIds: [draft.groupId] });
-      created.push({ id: s.id as string, name: s.name });
+      const s = await createStudentWithLogin(p.row.login, [draft.groupId]);
+      created.push({ id: s.id as string, login: s.login });
     } else {
+      used.add(choice);
       await Student.updateOne({ _id: choice }, { $addToSet: { groupIds: draft.groupId } });
       const c = (p as RowPlan & { kind: 'ask' }).candidates.find((x) => x.id === choice)!;
-      added.push({ id: c.id, name: c.name, line: p.row.line });
+      added.push({ id: c.id, login: c.login, line: p.row.line });
     }
   }
   return {
@@ -99,29 +98,16 @@ export function adminImportRouter() {
     render(res, 200, { groupId: typeof req.query.group === 'string' ? req.query.group : '' }),
   );
 
-  const receiveFile = (req: Request, res: Response, next: NextFunction) =>
-    upload.single('file')(req, res, (err: unknown) => {
-      if (err instanceof multer.MulterError) {
-        res.locals.uploadError =
-          err.code === 'LIMIT_FILE_SIZE'
-            ? 'Le fichier dépasse 2\u00a0Mo.'
-            : 'Envoyez un seul fichier CSV.';
-        return next();
-      }
-      next(err);
-    });
-
-  router.post('/admin/students/import', receiveFile, async (req, res) => {
+  router.post('/admin/students/import', async (req, res) => {
     const raw = typeof req.body.groupId === 'string' ? req.body.groupId : '';
     const groupId = mongoose.isValidObjectId(raw) && (await Group.exists({ _id: raw })) ? raw : '';
-    if (res.locals.uploadError)
-      return render(res, 400, { groupId, error: res.locals.uploadError as string });
     if (!groupId) return render(res, 400, { error: 'Choisissez la classe des élèves importés.' });
-    if (!req.file || req.file.size === 0)
-      return render(res, 400, { groupId, error: 'Choisissez un fichier CSV.' });
-
-    const parsed = parseStudentsCsv(req.file.buffer);
-    if (parsed.fatal) return render(res, 400, { groupId, error: parsed.fatal });
+    const parsed = parseImportPayload(req.body.payload);
+    if (!parsed)
+      return render(res, 400, {
+        groupId,
+        error: 'Fichier non lu. Le fichier est lu par le navigateur\u00a0: activez JavaScript.',
+      });
 
     const draft: Draft = {
       groupId,
@@ -134,7 +120,7 @@ export function adminImportRouter() {
       delete req.session.importDraft;
       return render(res, 200, { groupId, result: await apply(draft, plans, {}) });
     }
-    // Same names found: ask before creating anyone.
+    // Same logins found: ask before creating anyone.
     req.session.importDraft = draft;
     await renderConfirm(res, draft, plans);
   });
@@ -149,11 +135,11 @@ export function adminImportRouter() {
         .filter((p): p is RowPlan & { kind: 'ask' } => p.kind === 'ask')
         .map((p) => ({
           line: p.row.line,
-          name: p.row.name,
+          login: p.row.login,
           suggested: p.suggested,
           candidates: p.candidates.map((c) => ({
             id: c.id,
-            name: c.name,
+            login: c.login,
             groups: groupsOf(c.groupIds),
           })),
         })),
@@ -165,7 +151,7 @@ export function adminImportRouter() {
   router.post('/admin/students/import/confirm', async (req, res) => {
     const draft = req.session.importDraft;
     if (!draft) {
-      setFlash(req, 'error', 'Cet import n’est plus en attente. Envoyez le fichier à nouveau.');
+      setFlash(req, 'error', 'Cet import n’est plus en attente. Importez le fichier à nouveau.');
       return res.redirect('/admin/students/import');
     }
     if (!(await Group.exists({ _id: draft.groupId }))) {

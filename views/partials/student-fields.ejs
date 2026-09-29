@@ -1,6 +1,7 @@
-<label>Nom complet
-  <input name="name" required maxlength="200" value="<%= values.name ?? '' %>" <%- errors.name ? 'aria-invalid="true"' : '' %>>
-  <% if (errors.name) { %><small><%= errors.name %></small><% } %>
+<label>Identifiant <small>(initiale du nom, un point, puis le prénom, jamais le nom de famille&nbsp;: m.alice)</small>
+  <input name="login" required maxlength="40" pattern="[a-z0-9]+(\.[a-z0-9]+)?" placeholder="m.alice" autocapitalize="none" spellcheck="false"
+    value="<%= values.login ?? '' %>" <%- errors.login ? 'aria-invalid="true"' : '' %>>
+  <% if (errors.login) { %><small data-testid="error-login"><%= errors.login %></small><% } %>
 </label>
 <fieldset class="checklist" data-testid="student-groups">
   <legend>Classes <small>(aucune, une ou plusieurs)</small></legend>

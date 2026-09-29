@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "allowJs": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],

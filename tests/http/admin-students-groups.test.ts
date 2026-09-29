@@ -6,6 +6,7 @@ import { Student } from '../../src/models/student.js';
 import { Exercise } from '../../src/models/exercise.js';
 import { Attempt } from '../../src/models/attempt.js';
 import { loginCode } from '../../src/lib/qr.js';
+import { readExport } from '../../public/import-csv.js';
 import { purgeStudents } from '../../src/lib/purge.js';
 import mongoose from 'mongoose';
 import {
@@ -50,29 +51,30 @@ describe('groups', () => {
     expect((await admin.get('/admin/groups')).text).toContain('2nde B');
   });
 
-  it('downloads one PNG per active student in a zip, named after them', async () => {
+  it('downloads one PNG per active student in a zip, named after their login', async () => {
     const group = await createGroup('2nde A');
-    const alice = await createStudent({ name: 'Alice Martin', groupId: group._id });
-    const bob = await createStudent({ name: 'Bob/Durand', groupId: group._id });
-    const gone = await createStudent({ name: 'Parti', groupId: group._id });
+    const alice = await createStudent({ login: 'm.alice', groupId: group._id });
+    const bob = await createStudent({ login: 'd.bob', groupId: group._id });
+    const gone = await createStudent({ login: 'parti', groupId: group._id });
     await Student.updateOne({ _id: gone.student._id }, { $set: { active: false } });
     const res = await admin.get(`/admin/groups/${group.id}/qr.zip`).buffer(true).parse(binary);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('application/zip');
     expect(res.headers['content-disposition']).toContain('2nde A-qr.zip');
     const files = unzipSync(new Uint8Array(res.body as Buffer));
-    // The PNG has no text: the login code is in the file name.
-    const aliceFile = `Alice Martin - ${alice.code}.png`;
-    expect(Object.keys(files).sort()).toEqual([aliceFile, `BobDurand - ${bob.code}.png`]);
+    // The PNG has no text: the login and code are in the file name.
+    const aliceFile = `m.alice - ${alice.code}.png`;
+    expect(Object.keys(files).sort()).toEqual([`d.bob - ${bob.code}.png`, aliceFile]);
     expect([...files[aliceFile]!.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
   });
 
   it('prints a sheet of QR cards', async () => {
     const group = await createGroup('2nde A');
-    const alice = await createStudent({ name: 'Alice Martin', groupId: group._id });
+    const alice = await createStudent({ login: 'm.alice', groupId: group._id });
     const res = await admin.get(`/admin/groups/${group.id}/qr`);
     expect(res.text.match(/data-testid="qr-card"/g)).toHaveLength(1);
     expect(res.text).toContain(`${alice.code.slice(0, 3)}\u00a0${alice.code.slice(3)}`);
+    expect(res.text).toContain('data-testid="login-name">m.alice<');
     expect(res.text).toContain('<svg');
   });
 });
@@ -84,8 +86,8 @@ describe('students', () => {
     const res = await admin
       .post('/admin/students')
       .type('form')
-      .send(`name=Zo%C3%A9%20Durand&groupIds=${group.id}&groupIds=${other.id}&groupIds=bogus`);
-    const student = await Student.findOne({ name: 'Zoé Durand' });
+      .send(`login=D.Zoe&groupIds=${group.id}&groupIds=${other.id}&groupIds=bogus`);
+    const student = await Student.findOne({ login: 'd.zoe' });
     expect(student!.groupIds.map(String).sort()).toEqual([group.id, other.id].sort());
     expect(res.headers.location).toBe(`/admin/students/${student!.id}/qr`);
     const qr1 = await admin.get(res.headers.location!);
@@ -97,50 +99,73 @@ describe('students', () => {
     expect(qr1.text).toContain(
       `data-testid="login-code">${code.slice(0, 3)}\u00a0${code.slice(3)}<`,
     );
+    expect(qr1.text).toContain('data-testid="login-name">d.zoe<');
+    // The login is all the app keeps about a student.
+    expect(Object.keys(student!.toObject())).not.toContain('name');
     expect(student!.toObject()).not.toHaveProperty('dob');
     const png = await admin.get(`/admin/students/${student!.id}/qr.png`).buffer(true).parse(binary);
     expect(png.headers['content-type']).toBe('image/png');
     expect(png.headers['content-disposition']).toContain(
-      `filename*=UTF-8''Zo%C3%A9%20Durand%20-%20${code}.png`,
+      `filename*=UTF-8''d.zoe%20-%20${code}.png`,
     );
   });
 
-  it('validates the form', async () => {
-    const res = await admin.post('/admin/students').type('form').send({ name: '' });
+  it('gives a taken login the next free number', async () => {
+    await createStudent({ login: 'd.zoe' });
+    await createStudent({ login: 'd.zoe2' });
+    const res = await admin.post('/admin/students').type('form').send({ login: 'd.zoe' });
+    const student = await Student.findOne({ login: 'd.zoe3' });
+    expect(res.headers.location).toBe(`/admin/students/${student!.id}/qr`);
+    expect((await admin.get(res.headers.location!)).text).toContain(
+      'L’identifiant d.zoe était déjà pris\u00a0: l’élève a reçu d.zoe3.',
+    );
+  });
+
+  it('validates the form and refuses a full name', async () => {
+    const res = await admin.post('/admin/students').type('form').send({ login: '' });
     expect(res.status).toBe(400);
-    expect(res.text).toContain('Le nom est obligatoire');
+    expect(res.text).toContain('L’identifiant est obligatoire');
+    const named = await admin.post('/admin/students').type('form').send({ login: 'Zoé Durand' });
+    expect(named.status).toBe(400);
+    expect(named.text).toContain('Initiale du nom, un point, puis le prénom');
+    expect(await Student.countDocuments()).toBe(0);
   });
 
   it('a student can have no class', async () => {
-    await admin.post('/admin/students').type('form').send({ name: 'Sans Classe' });
-    const student = await Student.findOne({ name: 'Sans Classe' });
+    await admin.post('/admin/students').type('form').send({ login: 'c.sans' });
+    const student = await Student.findOne({ login: 'c.sans' });
     expect(student!.groupIds).toEqual([]);
     const list = await admin.get('/admin/students?group=none');
-    expect(list.text).toContain('Sans Classe');
+    expect(list.text).toContain('c.sans');
   });
 
   it('edits, changes classes, regenerates and deactivates', async () => {
     const a = await createGroup('A');
     const b = await createGroup('B');
     const s = await createStudent({ groupId: a._id });
+    await createStudent({ login: 'p.bruno' });
     const phone = request.agent(app);
     await loginAsStudent(phone, s);
 
     await admin
       .post(`/admin/students/${s.student.id}`)
       .type('form')
-      .send(`name=${encodeURIComponent('Élodie Martin-Dupont')}&groupIds=${a.id}&groupIds=${b.id}`);
+      .send(`login=e.martin&groupIds=${a.id}&groupIds=${b.id}`);
     const moved = await Student.findById(s.student._id);
-    expect(moved!.name).toBe('Élodie Martin-Dupont');
+    expect(moved!.login).toBe('e.martin');
     expect(moved!.groupIds.map(String).sort()).toEqual([a.id, b.id].sort());
     expect((await admin.get(`/admin/students/${s.student.id}`)).text).toMatch(
       /data-testid="student-classes">A, B</,
     );
-    // No box ticked: no class at all.
-    await admin
+    // Another student's login is refused.
+    const taken = await admin
       .post(`/admin/students/${s.student.id}`)
       .type('form')
-      .send({ name: 'Élodie Martin-Dupont' });
+      .send({ login: 'p.bruno' });
+    expect(taken.status).toBe(400);
+    expect(taken.text).toContain('Un autre élève a déjà cet identifiant');
+    // No box ticked: no class at all.
+    await admin.post(`/admin/students/${s.student.id}`).type('form').send({ login: 'e.martin' });
     expect((await Student.findById(s.student._id))!.groupIds).toEqual([]);
 
     await admin.post(`/admin/students/${s.student.id}/qr`);
@@ -183,11 +208,12 @@ describe('students', () => {
 });
 
 describe('CSV import', () => {
-  const importFile = (agent: Agent, groupId: string, file: Buffer | string, name = 'eleves.csv') =>
+  // What public/import.js posts: the file stays in the browser, only logins are sent.
+  const importFile = (agent: Agent, groupId: string, csv: string) =>
     agent
       .post('/admin/students/import')
-      .field('groupId', groupId)
-      .attach('file', Buffer.from(file), name);
+      .type('form')
+      .send({ groupId, payload: JSON.stringify(readExport(csv)) });
 
   it('imports the sample export into the chosen class', async () => {
     const group = await createGroup('2nde A');
@@ -196,11 +222,10 @@ describe('CSV import', () => {
     expect(res.text).toMatch(/data-testid="created-count">1</);
     expect(res.text).toMatch(/data-testid="skipped-count">14</);
     const students = await Student.find();
-    // The date of birth column is ignored and never stored.
-    expect(students.map((s) => [s.name, s.groupIds.map(String)])).toEqual([
-      ['Alice Martin', [group.id]],
+    expect(students.map((s) => [s.login, s.groupIds.map(String)])).toEqual([
+      ['m.alice', [group.id]],
     ]);
-    expect(students[0]!.toObject()).not.toHaveProperty('dob');
+    expect(Object.keys(students[0]!.toObject())).not.toContain('name');
     // Same file, same class: nothing to ask, nothing to create.
     const again = await importFile(admin, group.id, EXPORT_CSV);
     expect(again.text).toMatch(/data-testid="created-count">0</);
@@ -208,37 +233,46 @@ describe('CSV import', () => {
     expect(await Student.countDocuments()).toBe(1);
   });
 
-  it('asks before importing a name that already exists, and reuses the student if chosen', async () => {
+  it('two pupils with the same login both get created, the second with a number', async () => {
+    const group = await createGroup('2nde A');
+    await importFile(admin, group.id, 'Élèves\nMARTIN Alice\nMOREAU Alice\n');
+    expect((await Student.find().sort({ login: 1 })).map((s) => s.login)).toEqual([
+      'm.alice',
+      'm.alice2',
+    ]);
+  });
+
+  it('asks before importing a login that already exists, and reuses the student if chosen', async () => {
     const a = await createGroup('2nde A');
     const b = await createGroup('2nde B');
-    const alice = await createStudent({ name: 'Alice Martin', groupId: a._id });
-    const homonym = await createStudent({ name: 'Zoé Petit' });
+    const alice = await createStudent({ login: 'm.alice', groupId: a._id });
+    const zoe = await createStudent({ login: 'p.zoe' });
     const csv =
       'Élèves,Né(e) le\n' +
-      'Alice Martin,03/05/2000\n' + // same name: the existing student is suggested
-      'ZOÉ PETIT,02/02/2010\n' +
-      'Nouveau Venu,01/01/2010\n';
+      'MARTIN Alice,03/05/2000\n' + // same login: the existing student is suggested
+      'PETIT Zoé,02/02/2010\n' +
+      'VENU Nouveau,01/01/2010\n';
     const ask = await importFile(admin, b.id, csv);
     expect(ask.text).toContain('data-testid="import-confirm"');
     // Nothing is written before the admin answers.
     expect(await Student.countDocuments()).toBe(2);
     expect(ask.text).toMatch(new RegExp(`value="${alice.student.id}" checked`));
-    expect(ask.text).toMatch(new RegExp(`value="${homonym.student.id}" checked`));
+    expect(ask.text).toMatch(new RegExp(`value="${zoe.student.id}" checked`));
 
     // Keep Alice and Zoé.
     const done = await admin
       .post('/admin/students/import/confirm')
       .type('form')
-      .send(`choice[L2]=${alice.student.id}&choice[L3]=${homonym.student.id}`);
+      .send(`choice[L2]=${alice.student.id}&choice[L3]=${zoe.student.id}`);
     expect(done.status).toBe(200);
     expect(done.text).toMatch(/data-testid="created-count">1</);
     expect(done.text).toMatch(/data-testid="added-count">2</);
     const aliceNow = (await Student.findById(alice.student._id))!;
     expect(aliceNow.groupIds.map(String).sort()).toEqual([a.id, b.id].sort());
     expect(aliceNow.qrVersion).toBe(alice.student.qrVersion); // same QR code
-    expect((await Student.findById(homonym.student._id))!.groupIds.map(String)).toEqual([b.id]);
+    expect((await Student.findById(zoe.student._id))!.groupIds.map(String)).toEqual([b.id]);
     expect(await Student.countDocuments()).toBe(3);
-    expect(await Student.countDocuments({ name: 'Nouveau Venu', groupIds: b._id })).toBe(1);
+    expect(await Student.countDocuments({ login: 'v.nouveau', groupIds: b._id })).toBe(1);
 
     // The draft is used once.
     const replay = await admin.post('/admin/students/import/confirm').type('form').send('');
@@ -246,10 +280,10 @@ describe('CSV import', () => {
     expect(await Student.countDocuments()).toBe(3);
   });
 
-  it('creating a new student for a homonym, or cancelling, are both possible', async () => {
+  it('creating a new student for a shared login, or cancelling, are both possible', async () => {
     const a = await createGroup('2nde A');
-    const alice = await createStudent({ name: 'Alice Martin', groupId: a._id });
-    const csv = 'Élèves\nAlice Martin\n';
+    const alice = await createStudent({ login: 'm.alice', groupId: a._id });
+    const csv = 'Élèves\nMARTIN Alice\n';
     const b = await createGroup('2nde B');
     await importFile(admin, b.id, csv);
     await admin.post('/admin/students/import/cancel');
@@ -257,15 +291,15 @@ describe('CSV import', () => {
 
     await importFile(admin, b.id, csv);
     await admin.post('/admin/students/import/confirm').type('form').send('choice[L2]=new');
-    expect(await Student.countDocuments({ name: 'Alice Martin' })).toBe(2);
+    expect(await Student.countDocuments({ login: 'm.alice2', groupIds: b._id })).toBe(1);
     expect((await Student.findById(alice.student._id))!.groupIds.map(String)).toEqual([a.id]);
   });
 
   it('an unknown choice falls back to the suggestion', async () => {
     const a = await createGroup('2nde A');
     const b = await createGroup('2nde B');
-    const alice = await createStudent({ name: 'Alice Martin', groupId: a._id });
-    await importFile(admin, b.id, 'Élèves\nAlice Martin\n');
+    const alice = await createStudent({ login: 'm.alice', groupId: a._id });
+    await importFile(admin, b.id, 'Élèves\nMARTIN Alice\n');
     await admin
       .post('/admin/students/import/confirm')
       .type('form')
@@ -276,21 +310,29 @@ describe('CSV import', () => {
     );
   });
 
-  it('writes nothing when the columns are missing, or without a group', async () => {
+  it('writes nothing without a class, without logins, or when names are posted', async () => {
     const group = await createGroup();
-    const res = await importFile(admin, group.id, 'Prénom,Classe\nA,B\n');
-    expect(res.status).toBe(400);
-    expect(res.text).toContain('Colonne introuvable');
-    const noGroup = await importFile(admin, '', 'Élèves\nA B\n');
+    const noGroup = await importFile(admin, '', 'Élèves\nMARTIN Alice\n');
     expect(noGroup.status).toBe(400);
+    const noPayload = await admin
+      .post('/admin/students/import')
+      .type('form')
+      .send({ groupId: group.id });
+    expect(noPayload.status).toBe(400);
+    expect(noPayload.text).toContain('activez JavaScript');
+    const named = await admin
+      .post('/admin/students/import')
+      .type('form')
+      .send({
+        groupId: group.id,
+        payload: JSON.stringify({
+          rows: [{ line: 2, login: 'MARTIN Alice' }],
+          duplicates: [],
+          errors: [],
+        }),
+      });
+    expect(named.status).toBe(400);
     expect(await Student.countDocuments()).toBe(0);
-  });
-
-  it('refuses files over 2 MB', async () => {
-    const group = await createGroup();
-    const res = await importFile(admin, group.id, 'x'.repeat(2 * 1024 * 1024 + 10));
-    expect(res.status).toBe(400);
-    expect(res.text).toContain('2\u00a0Mo');
   });
 });
 
@@ -317,8 +359,8 @@ describe('deleting', () => {
   it('a class keeps its students and exercises', async () => {
     const a = await createGroup('A');
     const b = await createGroup('B');
-    const both = await createStudent({ name: 'Deux Classes', groupIds: [a._id, b._id] });
-    const onlyA = await createStudent({ name: 'Une Classe', groupId: a._id });
+    const both = await createStudent({ login: 'c.deux', groupIds: [a._id, b._id] });
+    const onlyA = await createStudent({ login: 'c.une', groupId: a._id });
     const ex = await createExercise({ groupIds: [a._id, b._id] });
     await Attempt.create({ exerciseId: ex._id, studentId: onlyA.student._id });
 
@@ -379,8 +421,8 @@ describe('several classes', () => {
     expect(list.text).toContain('Pour A');
     expect(list.text).toContain('Pour B');
     expect((await student.get(`/exercises/${exB.id}`)).status).toBe(200);
-    expect((await admin.get(`/admin/groups/${a.id}`)).text).toContain(s.name);
-    expect((await admin.get(`/admin/groups/${b.id}`)).text).toContain(s.name);
+    expect((await admin.get(`/admin/groups/${a.id}`)).text).toContain(s.login);
+    expect((await admin.get(`/admin/groups/${b.id}`)).text).toContain(s.login);
     expect((await admin.get('/admin/groups')).text).toMatch(/A<\/a><\/td><td class="num">1</);
     const dashboard = await admin.get('/admin');
     expect(dashboard.text).toMatch(/data-testid="completed">0\/2</);
@@ -392,8 +434,8 @@ describe('dashboard', () => {
   it('shows results per student, filterable by group', async () => {
     const a = await createGroup('A');
     const b = await createGroup('B');
-    const alice = await createStudent({ name: 'Alice', groupId: a._id });
-    await createStudent({ name: 'Bruno', groupId: b._id });
+    const alice = await createStudent({ login: 'alice', groupId: a._id });
+    await createStudent({ login: 'bruno', groupId: b._id });
     const ex = await createExercise({ groupIds: [a._id, b._id] });
     const key = ex.blocks.find((x) => x.type === 'question')!.key;
     await Attempt.create({
@@ -409,12 +451,12 @@ describe('dashboard', () => {
       },
     });
     const res = await admin.get('/admin');
-    expect(res.text.indexOf('Alice')).toBeLessThan(res.text.indexOf('Bruno'));
+    expect(res.text.indexOf('>alice<')).toBeLessThan(res.text.indexOf('>bruno<'));
     expect(res.text).toMatch(/data-testid="completed">1\/1</);
     expect(res.text).toMatch(/data-testid="tooltips">1</);
     const filtered = await admin.get(`/admin?group=${b.id}`);
-    expect(filtered.text).toContain('Bruno');
-    expect(filtered.text).not.toContain('>Alice<');
+    expect(filtered.text).toContain('>bruno<');
+    expect(filtered.text).not.toContain('>alice<');
   });
 });
 
@@ -426,7 +468,7 @@ describe('delete wording', () => {
     await createStudent({ groupId: a._id });
     const page = await admin.get(`/admin/groups/${a.id}/delete`);
     expect(page.text).toContain(
-      'Son élève est conservé avec ses résultats ; il n’aura plus aucune classe.',
+      'Son élève est conservé avec ses résultats\u00a0; il n’aura plus aucune classe.',
     );
   });
 });
