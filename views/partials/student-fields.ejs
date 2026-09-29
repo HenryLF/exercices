@@ -1,13 +1,7 @@
-<div class="row">
-  <label>Nom complet
-    <input name="name" required maxlength="200" value="<%= values.name ?? '' %>" <%- errors.name ? 'aria-invalid="true"' : '' %>>
-    <% if (errors.name) { %><small><%= errors.name %></small><% } %>
-  </label>
-  <label>Date de naissance
-    <input type="date" name="dob" required value="<%= values.dob ?? '' %>" <%- errors.dob ? 'aria-invalid="true"' : '' %>>
-    <% if (errors.dob) { %><small><%= errors.dob %></small><% } %>
-  </label>
-</div>
+<label>Nom complet
+  <input name="name" required maxlength="200" value="<%= values.name ?? '' %>" <%- errors.name ? 'aria-invalid="true"' : '' %>>
+  <% if (errors.name) { %><small><%= errors.name %></small><% } %>
+</label>
 <fieldset class="checklist" data-testid="student-groups">
   <legend>Classes <small>(aucune, une ou plusieurs)</small></legend>
   <% if (groups.length === 0) { %><p><small>Aucune classe pour le moment.</small></p><% } %>

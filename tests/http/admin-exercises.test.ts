@@ -494,7 +494,7 @@ describe('results export', () => {
   it('exports a CSV per exercise with French headers, BOM and oui/non columns', async () => {
     const group = await createGroup('2nde A');
     const s = await createStudent({ name: 'Élodie Martin', groupId: group._id });
-    await createStudent({ name: 'Bruno Petit', dob: '2010-01-01', groupId: group._id });
+    await createStudent({ name: 'Bruno Petit', groupId: group._id });
     const ex = await createExercise({ groupIds: [group._id] });
     const [remise] = questionBlocks(plainBlocks(ex));
     await Attempt.create({

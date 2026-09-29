@@ -177,6 +177,12 @@ fieldset.question legend {
 .url code {
   word-break: break-all;
 }
+/* Login code printed next to each QR code. */
+.login-code strong {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  font-size: 1.15em;
+}
 
 /* Exercise table: one row per given value or question; green when solved, red after a wrong try. */
 .md > :last-child {
@@ -435,9 +441,6 @@ button.danger,
 a.danger-link {
   color: var(--err);
 }
-.warn {
-  color: var(--err);
-}
 .narrow-wide {
   max-width: 40rem;
 }
@@ -459,7 +462,7 @@ form.filter {
   max-width: 20rem;
 }
 
-/* Printable sheet: six cards (QR + name) per A4 page. */
+/* Printable sheet: six cards (QR + name + code) per A4 page. */
 .qr-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));

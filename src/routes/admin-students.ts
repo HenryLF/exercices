@@ -8,9 +8,8 @@ import { Group } from '../models/group.js';
 import { Student } from '../models/student.js';
 import { formatValue } from '../lib/answers.js';
 import { questionBlocks } from '../lib/blocks.js';
-import { dobSchema, formatDob } from '../lib/dates.js';
 import { setFlash } from '../lib/flash.js';
-import { loginUrl, qrPng, qrSvg } from '../lib/qr.js';
+import { formatCode, loginCode, loginUrl, qrPng, qrSvg } from '../lib/qr.js';
 import { standing, summarizeAttempt } from '../lib/results.js';
 import { blocksFor, isGenerated } from '../lib/content.js';
 import { asArray, fieldErrors } from '../lib/validation.js';
@@ -23,7 +22,6 @@ const studentSchema = z.object({
     .trim()
     .min(1, 'Le nom est obligatoire')
     .max(200),
-  dob: dobSchema,
 });
 
 /** The ticked classes of the form that exist; any number, possibly none. */
@@ -145,7 +143,6 @@ export function adminStudentsRouter() {
       students: students.map((s) => ({
         id: s.id as string,
         name: s.name,
-        dob: formatDob(s.dob),
         group: groupLabel(s.groupIds, names),
         active: s.active,
         lastLoginAt: s.lastLoginAt,
@@ -196,7 +193,6 @@ export function adminStudentsRouter() {
       student: {
         id: student.id as string,
         name: student.name,
-        dob: student.dob,
         group: groupLabel(student.groupIds, new Map(groups.map((g) => [g.id, g.name]))),
         active: student.active,
         lastLoginAt: student.lastLoginAt,
@@ -248,7 +244,6 @@ export function adminStudentsRouter() {
       student,
       {
         name: student.name,
-        dob: student.dob,
         groupIds: student.groupIds.map(String),
       },
       {},
@@ -278,12 +273,14 @@ export function adminStudentsRouter() {
       );
       return res.redirect(`/admin/students/${student.id}`);
     }
-    const url = loginUrl({ id: student.id as string, qrVersion: student.qrVersion });
+    const ref = { id: student.id as string, qrVersion: student.qrVersion };
+    const url = loginUrl(ref);
     res.set('Cache-Control', 'no-store');
     res.render('admin/student-qr', {
       title: `QR code\u00a0: ${student.name}`,
       student: { id: student.id as string, name: student.name },
       url,
+      code: formatCode(loginCode(ref)),
       svg: await qrSvg(url),
     });
   });
@@ -291,10 +288,15 @@ export function adminStudentsRouter() {
   router.get('/admin/students/:id/qr.png', async (req, res) => {
     const student = await loadStudent(req.params.id);
     if (!student.active) return res.redirect(`/admin/students/${student.id}`);
-    const png = await qrPng(loginUrl({ id: student.id as string, qrVersion: student.qrVersion }));
+    const ref = { id: student.id as string, qrVersion: student.qrVersion };
+    const png = await qrPng(loginUrl(ref));
     res.set('Cache-Control', 'no-store');
     res.set('Content-Type', 'image/png');
-    res.set('Content-Disposition', attachment(`${safeFileName(student.name)}.png`));
+    // The PNG has no text in it: the login code travels in the file name.
+    res.set(
+      'Content-Disposition',
+      attachment(`${safeFileName(`${student.name} - ${loginCode(ref)}`)}.png`),
+    );
     res.send(png);
   });
 

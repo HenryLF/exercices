@@ -6,14 +6,13 @@ const studentSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 200 },
     // normalizeName(name), kept in sync by the pre-validate hook; the login form is matched on it.
     nameKey: { type: String, required: true, index: true },
-    dob: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },
     // Classes the student belongs to: any number, possibly none.
     groupIds: {
       type: [{ type: Schema.Types.ObjectId, ref: 'Group' }],
       default: [],
       index: true,
     },
-    // Part of the signed QR token: bumping it kills every printed copy of the old QR code.
+    // Part of the signed QR token and of the login code: bumping it kills every printed copy.
     qrVersion: { type: Number, required: true, default: 1 },
     // Bumped on QR regeneration and deactivation: sessions carrying an older value are dropped.
     authVersion: { type: Number, required: true, default: 1 },

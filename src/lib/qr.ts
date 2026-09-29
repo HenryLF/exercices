@@ -32,6 +32,29 @@ export function signatureMatches(studentId: string, qrVersion: number, sig: stri
   return expected.length === given.length && timingSafeEqual(expected, given);
 }
 
+/**
+ * The 6-digit code printed next to the QR code and typed at login. Derived like the token, so it
+ * is never stored and changes with qrVersion. Someone who only saw the QR code (a photo of a
+ * screen, a leaked PNG) cannot sign in without it.
+ */
+export function loginCode(student: { id: string; qrVersion: number }): string {
+  const mac = createHmac('sha256', config.QR_SECRET)
+    .update(`code:${student.id}:${student.qrVersion}`)
+    .digest();
+  return String(mac.readUInt32BE(0) % 1_000_000).padStart(6, '0');
+}
+
+/** '482193' -> '482 193' (non-breaking space), easier to read on paper. */
+export function formatCode(code: string): string {
+  return `${code.slice(0, 3)}\u00a0${code.slice(3)}`;
+}
+
+export function codeMatches(student: { id: string; qrVersion: number }, typed: string): boolean {
+  const expected = Buffer.from(loginCode(student));
+  const given = Buffer.from(typed.replace(/[\s\u00a0]/g, ''));
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
 export function qrSvg(text: string): Promise<string> {
   return QRCode.toString(text, { type: 'svg', errorCorrectionLevel: 'M', margin: 2 });
 }

@@ -12,6 +12,7 @@
     <div class="qr-card" data-testid="qr-card">
       <div class="qr"><%- c.svg %></div>
       <strong><%= c.name %></strong>
+      <span class="login-code">Code&nbsp;: <strong data-testid="login-code"><%= c.code %></strong></span>
       <small><%= group.name %></small>
     </div>
   <% }) %>

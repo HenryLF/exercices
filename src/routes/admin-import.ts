@@ -4,7 +4,6 @@ import multer from 'multer';
 import { requireRole } from '../auth/middleware.js';
 import { Group } from '../models/group.js';
 import { Student } from '../models/student.js';
-import { formatDob } from '../lib/dates.js';
 import { setFlash } from '../lib/flash.js';
 import {
   parseStudentsCsv,
@@ -30,14 +29,13 @@ async function plan(rows: ImportRow[], groupId: string): Promise<RowPlan[]> {
   const nameKeys = [...new Set(rows.map((r) => normalizeName(r.name)))];
   const existing = await Student.find(
     { nameKey: { $in: nameKeys } },
-    { name: 1, dob: 1, groupIds: 1 },
+    { name: 1, groupIds: 1 },
   ).sort({ createdAt: 1 });
   return planImport(
     rows,
     existing.map((s) => ({
       id: s.id as string,
       name: s.name,
-      dob: s.dob,
       groupIds: s.groupIds.map(String),
     })),
     groupId,
@@ -58,11 +56,7 @@ async function apply(draft: Draft, plans: RowPlan[], choices: Record<string, unk
     // Keys are `L<line>`: purely numeric keys would make qs build a compacted array.
     const choice = p.kind === 'ask' ? resolveChoice(p, choices[`L${p.row.line}`]) : 'new';
     if (choice === 'new') {
-      const s = await Student.create({
-        name: p.row.name,
-        dob: p.row.dob,
-        groupIds: [draft.groupId],
-      });
+      const s = await Student.create({ name: p.row.name, groupIds: [draft.groupId] });
       created.push({ id: s.id as string, name: s.name });
     } else {
       await Student.updateOne({ _id: choice }, { $addToSet: { groupIds: draft.groupId } });
@@ -156,13 +150,10 @@ export function adminImportRouter() {
         .map((p) => ({
           line: p.row.line,
           name: p.row.name,
-          dob: formatDob(p.row.dob),
           suggested: p.suggested,
           candidates: p.candidates.map((c) => ({
             id: c.id,
             name: c.name,
-            dob: formatDob(c.dob),
-            sameDob: c.dob === p.row.dob,
             groups: groupsOf(c.groupIds),
           })),
         })),

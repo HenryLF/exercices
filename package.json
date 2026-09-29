@@ -11,7 +11,8 @@
     "check": "tsc --noEmit && eslint . && vitest run",
     "seed:admin": "tsx scripts/admin.ts set",
     "admin": "tsx scripts/admin.ts",
-    "migrate": "tsx scripts/migrate.ts"
+    "migrate": "tsx scripts/migrate.ts",
+    "purge": "tsx scripts/purge.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -101,25 +101,27 @@ describe('student QR login', () => {
     expect((await request(app).get(`/login/${s.token}`)).status).toBe(200);
   });
 
-  it('matches name loosely and date exactly; counts failures; locks after 5', async () => {
+  it('matches name loosely and code exactly; counts failures; locks after 5', async () => {
     const s = await createStudent();
+    const wrongCode = s.code === '000000' ? '000001' : '000000';
     const bad = await request(app)
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: s.name, dob: '2010-05-02' });
+      .send({ name: s.name, code: wrongCode });
     expect(bad.status).toBe(400);
+    expect(bad.text).toContain('Le nom ou le code ne correspond pas');
     expect((await Student.findById(s.student._id))!.failedAttempts).toBe(1);
     for (let i = 0; i < 3; i++)
-      await request(app).post(`/login/${s.token}`).type('form').send({ name: 'x', dob: s.dob });
+      await request(app).post(`/login/${s.token}`).type('form').send({ name: 'x', code: s.code });
     const fifth = await request(app)
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: 'x', dob: s.dob });
+      .send({ name: 'x', code: s.code });
     expect(fifth.status).toBe(429);
     const locked = await request(app)
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: s.name, dob: s.dob });
+      .send({ name: s.name, code: s.code });
     expect(locked.status).toBe(429);
   });
 
@@ -130,7 +132,7 @@ describe('student QR login', () => {
     const res = await phone
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: 'ELODIE martin', dob: s.dob });
+      .send({ name: 'ELODIE martin', code: ` ${s.code.slice(0, 3)} ${s.code.slice(3)} ` });
     expect(res.headers.location).toBe('/exercises/next');
     expect([res.headers['set-cookie']].flat().join()).toMatch(/Expires=/);
     await loginAsStudent(laptop, s);
@@ -170,7 +172,7 @@ describe('daily session renewal', () => {
     const login = await agent
       .post(`/login/${s.token}`)
       .type('form')
-      .send({ name: s.name, dob: s.dob });
+      .send({ name: s.name, code: s.code });
     const first = sessionId(login);
     expect(first).not.toBe('');
 

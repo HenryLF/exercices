@@ -4,6 +4,7 @@
 //   MONGODB_URI='mongodb+srv://...' npm run migrate
 //
 // 2026-09-29: a student's single `groupId` becomes a list `groupIds` (several classes, or none).
+// 2026-09-29: dates of birth are no longer stored (login uses a code printed with the QR code).
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
@@ -39,5 +40,10 @@ if (indexes.some((i) => i.name === 'groupId_1')) {
   await db.collection('students').dropIndex('groupId_1');
   console.log('students: dropped index groupId_1');
 }
+
+const dobs = await db
+  .collection('students')
+  .updateMany({ dob: { $exists: true } }, { $unset: { dob: '' } });
+console.log(`students: ${dobs.modifiedCount} dates of birth removed`);
 
 await mongoose.disconnect();

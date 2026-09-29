@@ -2,7 +2,8 @@
 <article class="qr-sheet">
   <h1><%= student.name %></h1>
   <div class="qr" data-testid="qr"><%- svg %></div>
-  <p><small>Scannez ce code, puis saisissez votre nom et votre date de naissance.</small></p>
+  <p class="login-code">Code&nbsp;: <strong data-testid="login-code"><%= code %></strong></p>
+  <p><small>Scannez le QR code, puis saisissez votre nom et ce code.</small></p>
   <p class="url"><code data-testid="login-url"><%= url %></code></p>
 </article>
 <p class="no-print">

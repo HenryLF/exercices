@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { unzipSync } from 'fflate';
 import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -6,10 +5,14 @@ import { Group } from '../../src/models/group.js';
 import { Student } from '../../src/models/student.js';
 import { Exercise } from '../../src/models/exercise.js';
 import { Attempt } from '../../src/models/attempt.js';
+import { loginCode } from '../../src/lib/qr.js';
+import { purgeStudents } from '../../src/lib/purge.js';
+import mongoose from 'mongoose';
 import {
   createExercise,
   createGroup,
   createStudent,
+  EXPORT_CSV,
   loginAsAdmin,
   loginAsStudent,
   makeApp,
@@ -49,8 +52,8 @@ describe('groups', () => {
 
   it('downloads one PNG per active student in a zip, named after them', async () => {
     const group = await createGroup('2nde A');
-    await createStudent({ name: 'Alice Martin', groupId: group._id });
-    await createStudent({ name: 'Bob/Durand', dob: '2010-01-01', groupId: group._id });
+    const alice = await createStudent({ name: 'Alice Martin', groupId: group._id });
+    const bob = await createStudent({ name: 'Bob/Durand', groupId: group._id });
     const gone = await createStudent({ name: 'Parti', groupId: group._id });
     await Student.updateOne({ _id: gone.student._id }, { $set: { active: false } });
     const res = await admin.get(`/admin/groups/${group.id}/qr.zip`).buffer(true).parse(binary);
@@ -58,15 +61,18 @@ describe('groups', () => {
     expect(res.headers['content-type']).toBe('application/zip');
     expect(res.headers['content-disposition']).toContain('2nde A-qr.zip');
     const files = unzipSync(new Uint8Array(res.body as Buffer));
-    expect(Object.keys(files).sort()).toEqual(['Alice Martin.png', 'BobDurand.png']);
-    expect([...files['Alice Martin.png']!.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    // The PNG has no text: the login code is in the file name.
+    const aliceFile = `Alice Martin - ${alice.code}.png`;
+    expect(Object.keys(files).sort()).toEqual([aliceFile, `BobDurand - ${bob.code}.png`]);
+    expect([...files[aliceFile]!.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
   });
 
   it('prints a sheet of QR cards', async () => {
     const group = await createGroup('2nde A');
-    await createStudent({ name: 'Alice Martin', groupId: group._id });
+    const alice = await createStudent({ name: 'Alice Martin', groupId: group._id });
     const res = await admin.get(`/admin/groups/${group.id}/qr`);
     expect(res.text.match(/data-testid="qr-card"/g)).toHaveLength(1);
+    expect(res.text).toContain(`${alice.code.slice(0, 3)}\u00a0${alice.code.slice(3)}`);
     expect(res.text).toContain('<svg');
   });
 });
@@ -78,9 +84,7 @@ describe('students', () => {
     const res = await admin
       .post('/admin/students')
       .type('form')
-      .send(
-        `name=Zo%C3%A9%20Durand&dob=2009-02-01&groupIds=${group.id}&groupIds=${other.id}&groupIds=bogus`,
-      );
+      .send(`name=Zo%C3%A9%20Durand&groupIds=${group.id}&groupIds=${other.id}&groupIds=bogus`);
     const student = await Student.findOne({ name: 'Zoé Durand' });
     expect(student!.groupIds.map(String).sort()).toEqual([group.id, other.id].sort());
     expect(res.headers.location).toBe(`/admin/students/${student!.id}/qr`);
@@ -89,26 +93,26 @@ describe('students', () => {
     expect(qr1.text).toContain('<svg');
     const url = /data-testid="login-url">([^<]+)</.exec(qr1.text)![1]!;
     expect(qr2.text).toContain(url);
+    const code = loginCode({ id: student!.id as string, qrVersion: student!.qrVersion });
+    expect(qr1.text).toContain(
+      `data-testid="login-code">${code.slice(0, 3)}\u00a0${code.slice(3)}<`,
+    );
+    expect(student!.toObject()).not.toHaveProperty('dob');
     const png = await admin.get(`/admin/students/${student!.id}/qr.png`).buffer(true).parse(binary);
     expect(png.headers['content-type']).toBe('image/png');
-    expect(png.headers['content-disposition']).toContain(`filename*=UTF-8''Zo%C3%A9%20Durand.png`);
+    expect(png.headers['content-disposition']).toContain(
+      `filename*=UTF-8''Zo%C3%A9%20Durand%20-%20${code}.png`,
+    );
   });
 
   it('validates the form', async () => {
-    const res = await admin
-      .post('/admin/students')
-      .type('form')
-      .send({ name: '', dob: '2999-01-01' });
+    const res = await admin.post('/admin/students').type('form').send({ name: '' });
     expect(res.status).toBe(400);
     expect(res.text).toContain('Le nom est obligatoire');
-    expect(res.text).toContain('dans le futur');
   });
 
   it('a student can have no class', async () => {
-    await admin
-      .post('/admin/students')
-      .type('form')
-      .send({ name: 'Sans Classe', dob: '2009-02-01' });
+    await admin.post('/admin/students').type('form').send({ name: 'Sans Classe' });
     const student = await Student.findOne({ name: 'Sans Classe' });
     expect(student!.groupIds).toEqual([]);
     const list = await admin.get('/admin/students?group=none');
@@ -125,9 +129,7 @@ describe('students', () => {
     await admin
       .post(`/admin/students/${s.student.id}`)
       .type('form')
-      .send(
-        `name=${encodeURIComponent('Élodie Martin-Dupont')}&dob=${s.dob}&groupIds=${a.id}&groupIds=${b.id}`,
-      );
+      .send(`name=${encodeURIComponent('Élodie Martin-Dupont')}&groupIds=${a.id}&groupIds=${b.id}`);
     const moved = await Student.findById(s.student._id);
     expect(moved!.name).toBe('Élodie Martin-Dupont');
     expect(moved!.groupIds.map(String).sort()).toEqual([a.id, b.id].sort());
@@ -138,7 +140,7 @@ describe('students', () => {
     await admin
       .post(`/admin/students/${s.student.id}`)
       .type('form')
-      .send({ name: 'Élodie Martin-Dupont', dob: s.dob });
+      .send({ name: 'Élodie Martin-Dupont' });
     expect((await Student.findById(s.student._id))!.groupIds).toEqual([]);
 
     await admin.post(`/admin/students/${s.student.id}/qr`);
@@ -189,16 +191,18 @@ describe('CSV import', () => {
 
   it('imports the sample export into the chosen class', async () => {
     const group = await createGroup('2nde A');
-    const res = await importFile(admin, group.id, readFileSync('sample/Export CSV.csv'));
+    const res = await importFile(admin, group.id, EXPORT_CSV);
     expect(res.status).toBe(200);
     expect(res.text).toMatch(/data-testid="created-count">1</);
     expect(res.text).toMatch(/data-testid="skipped-count">14</);
     const students = await Student.find();
-    expect(students.map((s) => [s.name, s.dob, s.groupIds.map(String)])).toEqual([
-      ['Alice Martin', '2000-05-03', [group.id]],
+    // The date of birth column is ignored and never stored.
+    expect(students.map((s) => [s.name, s.groupIds.map(String)])).toEqual([
+      ['Alice Martin', [group.id]],
     ]);
+    expect(students[0]!.toObject()).not.toHaveProperty('dob');
     // Same file, same class: nothing to ask, nothing to create.
-    const again = await importFile(admin, group.id, readFileSync('sample/Export CSV.csv'));
+    const again = await importFile(admin, group.id, EXPORT_CSV);
     expect(again.text).toMatch(/data-testid="created-count">0</);
     expect(again.text).toMatch(/data-testid="already-count">1</);
     expect(await Student.countDocuments()).toBe(1);
@@ -207,22 +211,21 @@ describe('CSV import', () => {
   it('asks before importing a name that already exists, and reuses the student if chosen', async () => {
     const a = await createGroup('2nde A');
     const b = await createGroup('2nde B');
-    const alice = await createStudent({ name: 'Alice Martin', dob: '2000-05-03', groupId: a._id });
-    const homonym = await createStudent({ name: 'Zoé Petit', dob: '2009-01-01' });
+    const alice = await createStudent({ name: 'Alice Martin', groupId: a._id });
+    const homonym = await createStudent({ name: 'Zoé Petit' });
     const csv =
       'Élèves,Né(e) le\n' +
-      'Alice Martin,03/05/2000\n' + // same name and date: the existing student is suggested
-      'ZOÉ PETIT,02/02/2010\n' + // same name, other date: a new student is suggested
+      'Alice Martin,03/05/2000\n' + // same name: the existing student is suggested
+      'ZOÉ PETIT,02/02/2010\n' +
       'Nouveau Venu,01/01/2010\n';
     const ask = await importFile(admin, b.id, csv);
     expect(ask.text).toContain('data-testid="import-confirm"');
     // Nothing is written before the admin answers.
     expect(await Student.countDocuments()).toBe(2);
     expect(ask.text).toMatch(new RegExp(`value="${alice.student.id}" checked`));
-    expect(ask.text).toMatch(/name="choice\[L3\]" value="new" checked/);
-    expect(ask.text).toContain('date de naissance différente');
+    expect(ask.text).toMatch(new RegExp(`value="${homonym.student.id}" checked`));
 
-    // Keep Alice, and say Zoé is the same person as the existing one after all.
+    // Keep Alice and Zoé.
     const done = await admin
       .post('/admin/students/import/confirm')
       .type('form')
@@ -245,13 +248,13 @@ describe('CSV import', () => {
 
   it('creating a new student for a homonym, or cancelling, are both possible', async () => {
     const a = await createGroup('2nde A');
-    const alice = await createStudent({ name: 'Alice Martin', dob: '2000-05-03', groupId: a._id });
-    const csv = 'Élèves,Né(e) le\nAlice Martin,03/05/2000\n';
-    await importFile(admin, a.id, 'Élèves,Né(e) le\nAlice Martin,04/05/2000\n');
+    const alice = await createStudent({ name: 'Alice Martin', groupId: a._id });
+    const csv = 'Élèves\nAlice Martin\n';
+    const b = await createGroup('2nde B');
+    await importFile(admin, b.id, csv);
     await admin.post('/admin/students/import/cancel');
     expect(await Student.countDocuments()).toBe(1);
 
-    const b = await createGroup('2nde B');
     await importFile(admin, b.id, csv);
     await admin.post('/admin/students/import/confirm').type('form').send('choice[L2]=new');
     expect(await Student.countDocuments({ name: 'Alice Martin' })).toBe(2);
@@ -261,8 +264,8 @@ describe('CSV import', () => {
   it('an unknown choice falls back to the suggestion', async () => {
     const a = await createGroup('2nde A');
     const b = await createGroup('2nde B');
-    const alice = await createStudent({ name: 'Alice Martin', dob: '2000-05-03', groupId: a._id });
-    await importFile(admin, b.id, 'Élèves,Né(e) le\nAlice Martin,03/05/2000\n');
+    const alice = await createStudent({ name: 'Alice Martin', groupId: a._id });
+    await importFile(admin, b.id, 'Élèves\nAlice Martin\n');
     await admin
       .post('/admin/students/import/confirm')
       .type('form')
@@ -277,8 +280,8 @@ describe('CSV import', () => {
     const group = await createGroup();
     const res = await importFile(admin, group.id, 'Prénom,Classe\nA,B\n');
     expect(res.status).toBe(400);
-    expect(res.text).toContain('Colonnes introuvables');
-    const noGroup = await importFile(admin, '', 'Élèves,Né(e) le\nA B,01/01/2010\n');
+    expect(res.text).toContain('Colonne introuvable');
+    const noGroup = await importFile(admin, '', 'Élèves\nA B\n');
     expect(noGroup.status).toBe(400);
     expect(await Student.countDocuments()).toBe(0);
   });
@@ -315,7 +318,7 @@ describe('deleting', () => {
     const a = await createGroup('A');
     const b = await createGroup('B');
     const both = await createStudent({ name: 'Deux Classes', groupIds: [a._id, b._id] });
-    const onlyA = await createStudent({ name: 'Une Classe', dob: '2010-01-01', groupId: a._id });
+    const onlyA = await createStudent({ name: 'Une Classe', groupId: a._id });
     const ex = await createExercise({ groupIds: [a._id, b._id] });
     await Attempt.create({ exerciseId: ex._id, studentId: onlyA.student._id });
 
@@ -425,5 +428,36 @@ describe('delete wording', () => {
     expect(page.text).toContain(
       'Son élève est conservé avec ses résultats ; il n’aura plus aucune classe.',
     );
+  });
+});
+
+describe('end-of-year purge', () => {
+  it('counts on a dry run, then deletes students, attempts and student sessions only', async () => {
+    const group = await createGroup();
+    const s = await createStudent({ groupId: group._id });
+    const ex = await createExercise({ groupIds: [group._id] });
+    await Attempt.create({ exerciseId: ex._id, studentId: s.student._id });
+    // Sessions go to this file's own database, so other test files are untouched.
+    const db = mongoose.connection.db!;
+    await db.collection<{ _id: string; session: string }>('sessions').insertMany([
+      { _id: 'st', session: JSON.stringify({ role: 'student', userId: s.student.id }) },
+      { _id: 'ad', session: JSON.stringify({ role: 'admin', userId: 'x' }) },
+    ]);
+
+    const dry = await purgeStudents(db, { withGroups: false, dryRun: true });
+    expect(dry).toEqual({ students: 1, attempts: 1, sessions: 1, groups: 0 });
+    expect(await Student.countDocuments()).toBe(1);
+
+    const done = await purgeStudents(db, { withGroups: false, dryRun: false });
+    expect(done).toEqual({ students: 1, attempts: 1, sessions: 1, groups: 0 });
+    expect(await Student.countDocuments()).toBe(0);
+    expect(await Attempt.countDocuments()).toBe(0);
+    expect(await db.collection('sessions').countDocuments()).toBe(1);
+    expect(await Group.countDocuments()).toBe(1);
+    expect(await Exercise.countDocuments()).toBe(1);
+
+    const withGroups = await purgeStudents(db, { withGroups: true, dryRun: false });
+    expect(withGroups.groups).toBe(1);
+    expect((await Exercise.findById(ex._id))!.groupIds).toEqual([]);
   });
 });

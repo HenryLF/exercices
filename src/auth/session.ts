@@ -17,7 +17,7 @@ declare module 'express-session' {
     // A CSV import waiting for the admin to decide about students with the same name.
     importDraft: {
       groupId: string;
-      rows: { line: number; name: string; dob: string }[];
+      rows: { line: number; name: string }[];
       duplicates: { line: number; name: string }[];
       errors: { line: number; message: string }[];
     };

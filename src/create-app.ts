@@ -7,7 +7,7 @@ import { config, isProd } from './config.js';
 import { connectDb } from './db.js';
 import { loadUser, originCheck } from './auth/middleware.js';
 import { sessionMiddleware } from './auth/session.js';
-import { formatDateTime, formatDob } from './lib/dates.js';
+import { formatDateTime } from './lib/dates.js';
 import { takeFlash } from './lib/flash.js';
 import { formatNumber, STATUS_LABELS } from './lib/numbers.js';
 import { HttpError, notFound } from './lib/http-error.js';
@@ -86,7 +86,6 @@ export function createApp(options: AppOptions = {}) {
     res.locals.path = req.path;
     res.locals.pico = PICO_CSS;
     res.locals.fmtDateTime = formatDateTime;
-    res.locals.fmtDob = formatDob;
     res.locals.fmtNumber = formatNumber;
     res.locals.statusLabel = STATUS_LABELS;
     res.locals.progressLabel = PROGRESS_LABELS;

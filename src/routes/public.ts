@@ -55,7 +55,7 @@ export function publicRouter({ loginLimit }: { loginLimit: number }) {
     res.status(up ? 200 : 503).json({ ok: up, db: up ? 'up' : 'down' });
   });
 
-  // --- Student: QR code (reusable), then name + date of birth
+  // --- Student: QR code (reusable), then name + the code printed next to it
   router.get('/login/:token', async (req, res) => {
     const student = await findStudentByToken(req.params.token);
     if (!student) throw new HttpError(404, INVALID_QR);
@@ -75,7 +75,7 @@ export function publicRouter({ loginLimit }: { loginLimit: number }) {
     const outcome = await attemptStudentLogin(
       String(req.params.token),
       parsed.data.name,
-      parsed.data.dob,
+      parsed.data.code,
     );
     switch (outcome.status) {
       case 'invalid-token':
@@ -86,7 +86,7 @@ export function publicRouter({ loginLimit }: { loginLimit: number }) {
         return render(outcome.locked ? 429 : 400, {
           _: outcome.locked
             ? 'Trop de tentatives échouées. Réessayez dans 15 minutes.'
-            : 'Le nom ou la date de naissance ne correspond pas à ce QR code.',
+            : 'Le nom ou le code ne correspond pas à ce QR code.',
         });
       case 'ok':
         await startSession(

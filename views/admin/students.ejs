@@ -14,12 +14,11 @@
 <% if (students.length > 0) { %>
 <div class="scroll">
 <table>
-  <thead><tr><th>Nom</th><th>Date de naissance</th><th>Classe</th><th>Dernière connexion</th><th>État</th></tr></thead>
+  <thead><tr><th>Nom</th><th>Classe</th><th>Dernière connexion</th><th>État</th></tr></thead>
   <tbody>
   <% students.forEach((s) => { %>
     <tr data-testid="student-row" class="<%= s.active ? '' : 'muted' %>">
       <td><a href="/admin/students/<%= s.id %>"><%= s.name %></a></td>
-      <td><%= s.dob %></td>
       <td><%= s.group || '—' %></td>
       <td><%= fmtDateTime(s.lastLoginAt) || '—' %></td>
       <td><%= s.active ? 'Actif' : 'Compte désactivé' %></td>

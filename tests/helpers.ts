@@ -7,7 +7,7 @@ import { Exercise } from '../src/models/exercise.js';
 import { Group } from '../src/models/group.js';
 import { Student } from '../src/models/student.js';
 import { withKeys, type NewBlock } from '../src/lib/blocks.js';
-import { loginToken } from '../src/lib/qr.js';
+import { loginCode, loginToken } from '../src/lib/qr.js';
 
 export type Agent = ReturnType<typeof request.agent>;
 
@@ -29,6 +29,10 @@ export async function loginAsAdmin(agent: Agent) {
   expect(res.headers.location).toBe('/admin');
 }
 
+/** Same shape as the school software's export: a header, then one pupil repeated 15 times. */
+export const EXPORT_CSV =
+  'Élèves,Né(e) le,Classe de rattachement,Sexe\n' + 'Alice Martin,03/05/2000,,F\n'.repeat(15);
+
 export async function createGroup(name = '2nde MRC') {
   return Group.create({ name });
 }
@@ -36,25 +40,26 @@ export async function createGroup(name = '2nde MRC') {
 export async function createStudent(
   opts: {
     name?: string;
-    dob?: string;
     /** Shortcut for one class. */
     groupId?: mongoose.Types.ObjectId | null;
     groupIds?: mongoose.Types.ObjectId[];
   } = {},
 ) {
   const name = opts.name ?? 'Élodie Martin';
-  const dob = opts.dob ?? '2010-05-01';
   const groupIds = opts.groupIds ?? (opts.groupId ? [opts.groupId] : []);
-  const student = await Student.create({ name, dob, groupIds });
-  const token = loginToken({ id: student.id as string, qrVersion: student.qrVersion });
-  return { student, token, name, dob };
+  const student = await Student.create({ name, groupIds });
+  const ref = { id: student.id as string, qrVersion: student.qrVersion };
+  return { student, token: loginToken(ref), name, code: loginCode(ref) };
 }
 
 export async function loginAsStudent(
   agent: Agent,
-  s: { token: string; name: string; dob: string },
+  s: { token: string; name: string; code: string },
 ) {
-  const res = await agent.post(`/login/${s.token}`).type('form').send({ name: s.name, dob: s.dob });
+  const res = await agent
+    .post(`/login/${s.token}`)
+    .type('form')
+    .send({ name: s.name, code: s.code });
   expect(res.status).toBe(302);
   expect(res.headers.location).toBe('/exercises/next');
 }

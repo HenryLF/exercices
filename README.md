@@ -10,8 +10,9 @@ To add a new kind of generated exercise, follow [docs/GENERATORS.md](docs/GENERA
 
 ## How it works
 
-- **Students** scan their QR code, then type their name and date of birth. The device stays
-  signed in as long as it is used at least once a month: the session is renewed every day.
+- **Students** scan their QR code, then type their name and the 6-digit code printed under the
+  QR code. No date of birth is stored. The device stays signed in as long as it is used at
+  least once a month: the session is renewed every day.
   The same QR code works on any number of devices and can be printed again at any time.
 - **Admins** sign in at `/admin/login`. They create classes, import students from the school
   software's CSV export, print or download the QR codes, create or generate exercises, assign
@@ -64,18 +65,21 @@ npm run admin -- remove <username>
 
 1. In **Classes**, create the class.
 2. On the class page, click **Importer un CSV** and send the export from the school software.
-   Only the columns *Élèves* and *Né(e) le* are read. If a name matches a student already
-   registered, the import asks, row by row, whether it is the same person (added to this class,
-   same QR code and results) or a new student. A student can belong to several classes, or none.
-3. Click **Planche à imprimer** to print one card per student, or **Télécharger les QR codes (zip)**
-   to get one PNG per student, named after them.
+   Only the column *Élèves* is read; every other column (date of birth, sex...) is ignored and
+   never stored. If a name matches a student already registered, the import asks, row by row,
+   whether it is the same person (added to this class, same QR code and results) or a new
+   student. A student can belong to several classes, or none.
+3. Click **Planche à imprimer** to print one card per student (QR code, name and login code), or
+   **Télécharger les QR codes (zip)** to get one PNG per student, named
+   `<name> - <code>.png` (the image itself has no text, so hand the code over with it).
 4. In **Exercices**, click **Générer un exercice**, pick *Calculs commerciaux*, and create it.
    It is endless: every student gets new numbers on each attempt and can start again once
    finished. Check it with **Aperçu**, which shows a new random draw each time.
 5. Back on the class page, tick the exercise under **Exercices**, set the order, and click
    **Enregistrer les exercices de la classe**. Ticking a draft opens it to the students.
 
-Names match loosely at sign-in: case, accents, hyphens and extra spaces are ignored. After 5
+Names match loosely at sign-in: case, accents, hyphens and extra spaces are ignored. The code is
+derived from the QR code (nothing stored) and changes when a new QR code is generated. After 5
 wrong attempts, sign-in is locked for 15 minutes.
 
 ## Deleting
@@ -84,6 +88,21 @@ Students, classes and exercises each have a **Supprimer** button leading to a co
 Deleting a student or an exercise also deletes its attempts. Deleting a class keeps its students
 and exercises. To hide something without losing results, deactivate the student or close the
 exercise instead.
+
+## End of the school year
+
+Pupils' personal data (names, results) should not be kept longer than needed. At the end of the
+year, purge it:
+
+```bash
+npm run purge                          # dry run: shows what would be deleted
+npm run purge -- --yes                 # deletes every student, attempt and student session
+npm run purge -- --yes --with-groups   # also deletes the classes
+MONGODB_URI='mongodb+srv://...' npm run purge -- --yes   # production
+```
+
+Admins and exercises are kept. Export the results you need (CSV per exercise) before purging:
+nothing can be recovered afterwards, except from a database backup.
 
 ## Upgrading data
 

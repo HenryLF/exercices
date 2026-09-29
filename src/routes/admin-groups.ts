@@ -7,7 +7,7 @@ import { Group } from '../models/group.js';
 import { Student } from '../models/student.js';
 import { setFlash } from '../lib/flash.js';
 import { KIND_LABELS } from '../lib/generators/index.js';
-import { loginUrl, qrPng, qrSvg } from '../lib/qr.js';
+import { formatCode, loginCode, loginUrl, qrPng, qrSvg } from '../lib/qr.js';
 import { asArray, fieldErrors } from '../lib/validation.js';
 import { attachment, safeFileName, uniqueFileNames, zipFiles } from '../lib/zip.js';
 import { isDuplicateKey, loadGroup } from './load.js';
@@ -211,15 +211,15 @@ export function adminGroupsRouter() {
       nameKey: 1,
     });
 
-  // Printable sheet: one card (QR + name) per active student.
+  // Printable sheet: one card (QR + name + login code) per active student.
   router.get('/admin/groups/:id/qr', async (req, res) => {
     const group = await loadGroup(req.params.id);
     const students = await activeStudents(group._id);
     const cards = await Promise.all(
-      students.map(async (s) => ({
-        name: s.name,
-        svg: await qrSvg(loginUrl({ id: s.id as string, qrVersion: s.qrVersion })),
-      })),
+      students.map(async (s) => {
+        const ref = { id: s.id as string, qrVersion: s.qrVersion };
+        return { name: s.name, code: formatCode(loginCode(ref)), svg: await qrSvg(loginUrl(ref)) };
+      }),
     );
     res.set('Cache-Control', 'no-store');
     res.render('admin/group-qr-sheet', {
@@ -229,12 +229,14 @@ export function adminGroupsRouter() {
     });
   });
 
-  // One PNG per active student, named after the student.
+  // One PNG per active student, named `<student> - <login code>.png` (no text inside the image).
   router.get('/admin/groups/:id/qr.zip', async (req, res) => {
     const group = await loadGroup(req.params.id);
     const students = await activeStudents(group._id);
     const names = uniqueFileNames(
-      students.map((s) => s.name),
+      students.map(
+        (s) => `${s.name} - ${loginCode({ id: s.id as string, qrVersion: s.qrVersion })}`,
+      ),
       '.png',
     );
     const files = await Promise.all(
