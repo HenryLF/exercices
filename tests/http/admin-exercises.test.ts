@@ -410,6 +410,11 @@ describe('generated exercises', () => {
     const student = request.agent(app);
     await loginAsStudent(student, s);
     expect((await student.get('/exercises/next')).headers.location).toBe(`/exercises/${ex.id}`);
+    const rounds = async () =>
+      /data-testid="rounds">([^<]*(?:<strong>\d+<\/strong>[^<]*)?)</.exec(
+        (await student.get('/exercises')).text,
+      )?.[1];
+    expect(await rounds()).toBe('Pas encore réussi');
 
     const solve = async (withWrongFirst: boolean) => {
       await student.get(`/exercises/${ex.id}`);
@@ -434,6 +439,7 @@ describe('generated exercises', () => {
     };
 
     const seed1 = await solve(true);
+    expect(await rounds()).toBe('Réussi <strong>1</strong>&nbsp;fois');
     const done = await student.get(`/exercises/${ex.id}?done=1`);
     expect(done.text).toContain('data-testid="retry"');
     // Finished once: /next no longer sends the student back here.
@@ -452,8 +458,8 @@ describe('generated exercises', () => {
     const first = questionStates(attempts[0])['b_00000003']!;
     expect(first.tries.map((t) => t.correct)).toEqual([false, true]);
 
-    const list = await student.get('/exercises');
-    expect(list.text).toContain('Terminé ×2');
+    // The card counts every completed draw.
+    expect(await rounds()).toBe('Réussi <strong>2</strong>&nbsp;fois');
     const results = await admin.get(`/admin/exercises/${ex.id}/results`);
     expect(results.text.match(/data-testid="result-row"/g)).toHaveLength(2);
     expect(results.text).toContain(seed1!);
@@ -487,6 +493,8 @@ describe('generated exercises', () => {
     expect(await Attempt.countDocuments({ exerciseId: ex._id })).toBe(1);
     const list = await student.get('/exercises');
     expect(list.text).not.toContain('S’entraîner encore');
+    // Not infinite: no counter.
+    expect(list.text).not.toContain('data-testid="rounds"');
   });
 });
 

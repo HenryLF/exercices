@@ -309,6 +309,11 @@ button.tip-button {
   font-weight: bold;
   margin-bottom: 0.5rem;
 }
+.ex-card-count {
+  margin: -0.25rem 0 0.5rem;
+  color: var(--pico-muted-color);
+  font-size: 0.9rem;
+}
 .ex-card-row {
   display: flex;
   flex-wrap: wrap;

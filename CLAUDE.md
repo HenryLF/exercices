@@ -642,7 +642,9 @@ deviated from the plan.
   questions collapse to one line showing the answer, "Indice" is a pill button, fields are 16 px
   (no iOS zoom) with `enterkeyhint="done"`, the header drops the student's name, and
   `public/exercise.js` focuses the question in the URL hash and blocks double submits.
-- The admin checkbox for `allowRetry` is labelled "Infini" (owner's wording).
+- The admin checkbox for `allowRetry` is labelled "Infini" (owner's wording). On `/exercises`,
+  the card of an infinite exercise shows how many draws the student completed ("Réussi N fois",
+  `data-testid="rounds"`), counted by `standing().completed`.
 - The preview of a generated exercise takes `?seed=` (validated by `SEED_RE`, otherwise a random
   draw with a message) and has a form to type one. Every seed shown on the results page and the
   student page links to `/admin/exercises/:id/preview?seed=<seed>` (`views/partials/seed-link.ejs`).

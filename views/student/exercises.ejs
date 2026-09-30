@@ -8,10 +8,13 @@
   <% exercises.forEach((e) => { const st = e.standing; const inProgress = st.current && st.current.progress === 'in_progress'; %>
     <article class="ex-card" data-testid="exercise-row">
       <a href="/exercises/<%= e.id %>" class="ex-card-title"><%= e.name %></a>
+      <% if (e.canRetry) { %>
+        <p class="ex-card-count" data-testid="rounds"><%- st.completed === 0 ? 'Pas encore réussi' : `Réussi <strong>${st.completed}</strong>&nbsp;fois` %></p>
+      <% } %>
       <div class="ex-card-row">
         <span class="ex-card-badges">
           <% if (e.status === 'closed') { %><%- include('../partials/status', { status: e.status }) %><% } %>
-          <% if (st.completed > 0) { %><span class="badge badge-completed" data-testid="progress">Terminé<%= st.completed > 1 ? ` ×${st.completed}` : '' %></span><% } %>
+          <% if (st.completed > 0) { %><span class="badge badge-completed" data-testid="progress">Terminé<%= st.completed > 1 && !e.canRetry ? ` ×${st.completed}` : '' %></span><% } %>
           <% if (inProgress) { %><%- include('../partials/progress', { summary: st.current }) %><% } %>
           <% if (!st.current) { %><%- include('../partials/progress', { summary: { progress: 'todo' } }) %><% } %>
         </span>
