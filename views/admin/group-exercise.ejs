@@ -1,0 +1,36 @@
+<%- include('../partials/head') %>
+<hgroup>
+  <h1><%= exercise.name %></h1>
+  <p>
+    <a href="/admin/groups/<%= group.id %>"><%= group.name %></a>
+    · <%- include('../partials/status', { status: exercise.status }) %>
+    · <a href="/admin/exercises/<%= exercise.id %>/results">Résultats détaillés, toutes classes</a>
+  </p>
+</hgroup>
+<% if (!exercise.assigned) { %>
+  <p class="flash flash-error" data-testid="not-assigned">Cet exercice n’est pas affecté à cette classe&nbsp;: ses élèves ne le voient pas.</p>
+<% } %>
+<% if (cards.length === 0) { %>
+  <p data-testid="empty">Aucun élève actif dans cette classe.</p>
+<% } else { %>
+  <p data-testid="totals">
+    <strong><%= totals.completed %></strong> terminé<%= totals.completed > 1 ? 's' : '' %>
+    · <strong><%= totals.inProgress %></strong> en cours
+    · <strong><%= totals.todo %></strong> pas commencé<%= totals.todo > 1 ? 's' : '' %>
+    <small>(sur <%= cards.length %> élève<%= cards.length > 1 ? 's' : '' %>)</small>
+  </p>
+  <div class="student-grid">
+    <% cards.forEach((c) => { const st = c.standing; const cur = st.current; %>
+      <a class="student-card <%= !cur ? 'is-todo' : cur.progress === 'completed' ? 'is-done' : 'is-going' %>"
+         href="/admin/students/<%= c.id %>?exercise=<%= exercise.id %>#ex-<%= exercise.id %>" data-testid="student-card">
+        <strong class="student-card-login"><%= c.login %></strong>
+        <%- include('../partials/progress', { summary: cur ?? { progress: 'todo' } }) %>
+        <% if (cur && cur.progress === 'in_progress') { %>
+          <progress value="<%= cur.solved %>" max="<%= cur.total %>"></progress>
+        <% } %>
+        <small data-testid="solved-count"><%= st.completed === 0 ? 'Jamais réussi' : `Réussi ${st.completed} fois` %></small>
+      </a>
+    <% }) %>
+  </div>
+<% } %>
+<%- include('../partials/foot') %>
