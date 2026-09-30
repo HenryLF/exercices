@@ -249,6 +249,8 @@ export function adminStudentsRouter() {
 
   router.get('/admin/students/:id', async (req, res) => {
     const student = await loadStudent(req.params.id);
+    // Coming from a class's exercise page: that exercise's detail is shown open.
+    res.locals.openExercise = typeof req.query.exercise === 'string' ? req.query.exercise : '';
     await renderDetail(
       res,
       student,

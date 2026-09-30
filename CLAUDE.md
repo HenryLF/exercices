@@ -160,7 +160,7 @@ src/routes/public.ts             /, /healthz, /login/:token, /admin/login, /logo
 src/routes/student.ts            /exercises, /exercises/next, /exercises/:id, question + tooltip POSTs
 src/routes/admin-students.ts     /admin (dashboard), /admin/students/*, QR page/PNG/regenerate, deactivate, delete
 src/routes/admin-import.ts       /admin/students/import: posted logins, then a question for same-login rows, confirm, cancel
-src/routes/admin-groups.ts       /admin/groups/*, exercise assignment + order, qr.zip, printable sheet
+src/routes/admin-groups.ts       /admin/groups/*, exercise assignment + order, class × exercise cards, qr.zip, printable sheet
 src/routes/admin-exercises.ts    /admin/exercises/*: custom editor, generate (templates), status, preview, results, CSV
 src/routes/admin-help.ts         /admin/help: admin guide (classes, students, exercises, results, privacy and security)
 src/routes/load.ts               loadStudent / loadGroup / loadExercise (404 on bad ids)
@@ -169,7 +169,7 @@ views/partials/                  head (nav + flash), foot, form-error, status, p
 views/{welcome,error,login-admin,login-student}.ejs
 views/student/                   exercises.ejs, exercise.ejs
 views/admin/                     index (per-student results), students, student, student-qr, import,
-                                 groups, group, group-qr-sheet, exercises, exercise-edit, block-row,
+                                 groups, group, group-exercise, group-qr-sheet, exercises, exercise-edit, block-row,
                                  generate, generate-billing, exercise-results, preview, help
 public/                          app.css, print.js, block-editor.js, autosubmit.js, exercise.js,
                                  import.js + import-csv.js (CSV → logins, in the browser), favicon.svg
@@ -495,7 +495,11 @@ CSV export per exercise (`src/lib/csv.ts`, UTF-8 with BOM, French headers, as po
   exercise with an "Affecté" checkbox and its order** (`POST /admin/groups/:id/exercises`).
   Assignment lives here, not on the exercise page **(decided 2026-09-28)**; ticking a draft opens
   it. The order is shared by all classes of the exercise. Also buttons **Télécharger les QR codes (zip)** and
-  **Planche à imprimer**.
+  **Planche à imprimer**. Each assigned exercise has a **Suivre la classe** link to
+  `/admin/groups/:id/exercises/:exerciseId`: a grid of cards (not a table), one per active student
+  of the class, with their current progress (latest attempt: badge + bar) and how many times they
+  finished the exercise, plus class totals (terminés / en cours / pas commencés). A card opens
+  `/admin/students/:id?exercise=<id>#ex-<id>`, where that exercise's detail is unfolded.
 - `/admin/students`: list filterable by group; create one (login, groups) → redirects to the
   QR page; **Importer un CSV**.
 - `/admin/students/:id`: edit login / groups, **QR code** (always available), regenerate,
@@ -556,7 +560,7 @@ CSV export per exercise (`src/lib/csv.ts`, UTF-8 with BOM, French headers, as po
 | GET `/admin/exercises`, GET `/admin/exercises/new`, POST `/admin/exercises`, GET/POST `/admin/exercises/:id` | admin |
 | GET `/admin/exercises/generate`, GET/POST `/admin/exercises/generate/:kind` | admin |
 | POST `/admin/exercises/:id/status`, GET `/admin/exercises/:id/{preview,results,export.csv}` | admin |
-| POST `/admin/groups/:id/exercises` (assignment and order) | admin |
+| POST `/admin/groups/:id/exercises` (assignment and order), GET `/admin/groups/:id/exercises/:exerciseId` (class progress cards) | admin |
 | POST `/exercises/:id/retry` (generated only, after completion) | student |
 
 Every mutating route: zod → on error re-render with status 400, `values` and `errors`; on

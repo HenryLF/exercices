@@ -36,7 +36,7 @@
 <form method="post" action="/admin/groups/<%= group.id %>/exercises" data-testid="assign-form">
   <div class="scroll">
   <table>
-    <thead><tr><th>Affecté</th><th>Exercice</th><th>Type</th><th>État</th><th class="num">Ordre</th></tr></thead>
+    <thead><tr><th>Affecté</th><th>Exercice</th><th>Type</th><th>État</th><th class="num">Ordre</th><th>Suivi</th></tr></thead>
     <tbody>
     <% exercises.forEach((e) => { %>
       <tr data-testid="assign-row">
@@ -45,6 +45,7 @@
         <td><%= e.kind %></td>
         <td><%- include('../partials/status', { status: e.status }) %></td>
         <td class="num"><input name="position[<%= e.id %>]" value="<%= e.position %>" inputmode="numeric" class="position" aria-label="Ordre de <%= e.name %>"></td>
+        <td><% if (e.assigned) { %><a href="/admin/groups/<%= group.id %>/exercises/<%= e.id %>" data-testid="follow">Suivre la classe</a><% } %></td>
       </tr>
     <% }) %>
     </tbody>

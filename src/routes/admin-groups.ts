@@ -2,15 +2,18 @@ import { Router, type Response } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 import { requireRole } from '../auth/middleware.js';
+import { Attempt, questionStates } from '../models/attempt.js';
 import { Exercise } from '../models/exercise.js';
 import { Group } from '../models/group.js';
 import { Student } from '../models/student.js';
 import { setFlash } from '../lib/flash.js';
+import { blocksFor, isGenerated } from '../lib/content.js';
 import { KIND_LABELS } from '../lib/generators/index.js';
 import { formatCode, loginCode, loginUrl, qrPng, qrSvg } from '../lib/qr.js';
+import { standing } from '../lib/results.js';
 import { asArray, fieldErrors } from '../lib/validation.js';
 import { attachment, safeFileName, uniqueFileNames, zipFiles } from '../lib/zip.js';
-import { isDuplicateKey, loadGroup } from './load.js';
+import { isDuplicateKey, loadExercise, loadGroup } from './load.js';
 
 const groupSchema = z.object({
   name: z
@@ -253,6 +256,49 @@ export function adminGroupsRouter() {
     res.set('Content-Type', 'application/zip');
     res.set('Content-Disposition', attachment(`${safeFileName(group.name)}-qr.zip`));
     res.send(zipFiles(files));
+  });
+
+  /**
+   * One class on one exercise: a card per active student with where they are now (their latest
+   * attempt) and how many times they finished it. Each card opens the student's detail.
+   */
+  router.get('/admin/groups/:id/exercises/:exerciseId', async (req, res) => {
+    const group = await loadGroup(req.params.id);
+    const exercise = await loadExercise(req.params.exerciseId);
+    const students = await Student.find(
+      { groupIds: group._id, active: true },
+      { login: 1, lastSeenAt: 1, lastLoginAt: 1 },
+    ).sort({ login: 1 });
+    const attempts = await Attempt.find({
+      exerciseId: exercise._id,
+      studentId: { $in: students.map((s) => s._id) },
+    }).lean();
+    const cards = students.map((s) => {
+      const mine = attempts.filter((a) => String(a.studentId) === (s.id as string));
+      return {
+        id: s.id as string,
+        login: s.login,
+        standing: standing((seed) => blocksFor(exercise, seed), mine, questionStates),
+      };
+    });
+    const count = (p: (c: (typeof cards)[number]) => boolean) => cards.filter(p).length;
+    res.render('admin/group-exercise', {
+      title: `${exercise.name} · ${group.name}`,
+      group: { id: group.id as string, name: group.name },
+      exercise: {
+        id: exercise.id as string,
+        name: exercise.name,
+        status: exercise.status,
+        generated: isGenerated(exercise),
+        assigned: exercise.groupIds.some((g) => String(g) === group.id),
+      },
+      cards,
+      totals: {
+        completed: count((c) => c.standing.completed > 0),
+        inProgress: count((c) => c.standing.current?.progress === 'in_progress'),
+        todo: count((c) => !c.standing.current),
+      },
+    });
   });
 
   return router;

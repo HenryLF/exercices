@@ -503,3 +503,70 @@ describe('end-of-year purge', () => {
     expect((await Exercise.findById(ex._id))!.groupIds).toEqual([]);
   });
 });
+
+describe('class progress on one exercise', () => {
+  it('shows one card per active student, opening their detail', async () => {
+    const group = await createGroup('2nde A');
+    const done = await createStudent({ login: 'a.done', groupId: group._id });
+    const going = await createStudent({ login: 'b.going', groupId: group._id });
+    await createStudent({ login: 'c.todo', groupId: group._id });
+    const gone = await createStudent({ login: 'd.gone', groupId: group._id });
+    await Student.updateOne({ _id: gone.student._id }, { $set: { active: false } });
+    const ex = await createExercise({ groupIds: [group._id] });
+    const [k1] = ex.blocks.filter((b) => b.type === 'question').map((b) => b.key);
+    const tryOk = { try: 1, tooltip: false, value: 10, correct: true, at: new Date() };
+    await Attempt.create({
+      exerciseId: ex._id,
+      studentId: done.student._id,
+      status: 'completed',
+      completedAt: new Date(),
+      questions: { [k1!]: { solved: true, tooltipShown: false, tries: [tryOk] } },
+    });
+    await Attempt.create({
+      exerciseId: ex._id,
+      studentId: going.student._id,
+      questions: { [k1!]: { solved: true, tooltipShown: false, tries: [tryOk] } },
+    });
+
+    const cls = await admin.get(`/admin/groups/${group.id}`);
+    const url = `/admin/groups/${group.id}/exercises/${ex.id}`;
+    expect(cls.text).toContain(`href="${url}"`);
+
+    const page = await admin.get(url);
+    expect(page.status).toBe(200);
+    expect(page.text).not.toContain('data-testid="not-assigned"');
+    const cards = page.text.split('data-testid="student-card"').slice(1);
+    expect(cards).toHaveLength(3); // the inactive student is left out
+    expect(cards[0]).toContain('a.done');
+    expect(cards[0]).toContain('Terminé');
+    expect(cards[0]).toContain('Réussi 1 fois');
+    expect(cards[1]).toContain('En cours 1/2');
+    expect(cards[1]).toContain('Jamais réussi');
+    expect(cards[2]).toContain('À faire');
+    expect(page.text.replace(/\s+/g, ' ')).toContain(
+      '<strong>1</strong> terminé · <strong>1</strong> en cours · <strong>1</strong> pas commencé',
+    );
+
+    // A card opens the student's page with this exercise unfolded.
+    const href = `/admin/students/${done.student.id}?exercise=${ex.id}`;
+    expect(page.text).toContain(`href="${href}#ex-${ex.id}"`);
+    const detail = await admin.get(href);
+    expect(detail.text).toMatch(new RegExp(`id="ex-${ex.id}" data-testid="exercise-detail" open`));
+    expect((await admin.get(`/admin/students/${done.student.id}`)).text).not.toMatch(
+      /data-testid="exercise-detail" open/,
+    );
+  });
+
+  it('warns when the exercise is not assigned, and is for admins only', async () => {
+    const group = await createGroup('2nde A');
+    const s = await createStudent({ groupId: group._id });
+    const ex = await createExercise({ groupIds: [] });
+    const url = `/admin/groups/${group.id}/exercises/${ex.id}`;
+    expect((await admin.get(url)).text).toContain('data-testid="not-assigned"');
+    expect((await admin.get(`/admin/groups/${group.id}/exercises/nope`)).status).toBe(404);
+    expect((await request(app).get(url)).headers.location).toBe('/admin/login');
+    const student = request.agent(app);
+    await loginAsStudent(student, s);
+    expect((await student.get(url)).status).toBe(403);
+  });
+});

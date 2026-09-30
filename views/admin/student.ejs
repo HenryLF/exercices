@@ -30,7 +30,7 @@
   <p>Aucun exercice affecté à sa classe.</p>
 <% } %>
 <% exercises.forEach((e) => { const st = e.standing; %>
-  <details data-testid="exercise-detail">
+  <details id="ex-<%= e.id %>" data-testid="exercise-detail" <%- locals.openExercise === e.id ? 'open' : '' %>>
     <summary>
       <%= e.name %> —
       <% if (st.completed > 0) { %><span class="badge badge-completed">Terminé<%= st.completed > 1 ? ` ×${st.completed}` : '' %></span><% } %>
